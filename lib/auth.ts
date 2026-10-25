@@ -246,9 +246,10 @@ export async function requireAdmin(
   const token = bearerToken(req);
   const claims = token ? verifyAccessToken(token) : null;
   if (claims) user = { id: claims.sub, role: claims.role, cafe_id: claims.cafe_id };
-  // ponytail: fallback cookie sesi web console admin (cookie TERPISAH dari customer).
-  // cafe_id null utk sesi cookie → cek forbidden-cafe fail-closed.
-  if (!user) {
+  // ponytail: fallback cookie sesi web console admin HANYA kalau TIDAK pakai Authorization header.
+  // Kalau pakai Bearer token tapi expired/invalid → return unauthorized, JANGAN fallback ke cookie
+  // (cookie session tidak punya cafe_id → bikin "Akun kasir belum terikat cafe" palsu).
+  if (!user && !token) {
     const sid = adminSessionIdFrom(req);
     const ctx = sid ? await authBySessionId(sid) : null;
     if (ctx && (ctx.user.role === "kasir" || ctx.user.role === "super_admin"))

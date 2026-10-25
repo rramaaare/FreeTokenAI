@@ -7,7 +7,6 @@ import { usePathname } from 'next/navigation';
 import type { LucideIcon } from 'lucide-react';
 import {
   Bell,
-  KeyRound,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -18,6 +17,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Users,
+  Wallet,
   X,
 } from 'lucide-react';
 
@@ -38,12 +38,14 @@ const NAV: Record<ConsoleRole, NavGroup[]> = {
     },
     {
       label: 'Keuangan',
-      items: [{ href: '/admin/transactions', label: 'Riwayat Transaksi', icon: ScrollText }],
+      items: [
+        { href: '/admin/transactions', label: 'Riwayat Transaksi', icon: ScrollText },
+        { href: '/admin/cafe-topup-requests', label: 'Permintaan Top-up Cafe', icon: Wallet },
+      ],
     },
     {
       label: 'Sistem',
       items: [
-        { href: '/admin/api-keys', label: 'API Key Pelanggan', icon: KeyRound },
         { href: '/admin/models', label: 'Provider & Model AI', icon: SlidersHorizontal },
         { href: '/admin/rbac', label: 'Peran & Hak Akses', icon: ShieldCheck },
       ],

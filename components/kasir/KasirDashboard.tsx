@@ -1,8 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { AlertCircle, Loader2, Plus, X } from "lucide-react";
 import { idr } from "@/components/kasir/KasirShell";
+import { cardCls, inputCls } from "@/components/admin/ui";
+
+const btnCls =
+  "rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white transition hover:bg-primary-hover disabled:opacity-50";
 
 type Sales = {
   receipts: number;
@@ -39,6 +44,11 @@ const dayLong = (day: string) =>
 
 const TX_LABEL: Record<string, string> = { topup: "Top-up", reserve: "Terbit struk", refund: "Struk hangus (dikembalikan)", adjustment: "Koreksi" };
 const ENDPOINT_LABEL: Record<string, string> = { chat: "Chat", image: "Gambar", video: "Video" };
+const TOPUP_STATUS_LABEL: Record<"pending" | "approved" | "rejected", { label: string; cls: string }> = {
+  pending: { label: "Menunggu", cls: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border-amber-200 dark:border-amber-800" },
+  approved: { label: "Disetujui", cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800" },
+  rejected: { label: "Ditolak", cls: "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300 border-red-200 dark:border-red-800" },
+};
 
 // Palet 2 seri divalidasi (dataviz validate_palette): oranye = produk, biru = ketengan.
 // Terang #F97316/#2563EB, gelap #EA6A0C/#3B82F6. Oranye < 3:1 di terang -> legend + tooltip + tabel sr-only.
@@ -52,8 +62,51 @@ const card = "rounded-2xl border border-neutral-200 bg-white shadow-sm dark:bord
 export default function KasirDashboard({ authFetch }: { authFetch: (path: string, init?: RequestInit) => Promise<Response> }) {
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showTopUpModal, setShowTopUpModal] = useState(false);
+  const [topupRequests, setTopupRequests] = useState<Array<{
+    id: string;
+    amount: number;
+    note: string | null;
+    status: "pending" | "approved" | "rejected";
+    approved_at: string | null;
+    rejection_reason: string | null;
+    created_at: string;
+  }>>([]);
+  const [topupLoading, setTopupLoading] = useState(false);
   const fetchRef = useRef(authFetch);
   fetchRef.current = authFetch;
+
+  const loadTopupRequests = useCallback(async () => {
+    setTopupLoading(true);
+    try {
+      const res = await fetchRef.current("/api/v1/kasir/topup-requests");
+      if (res.ok) {
+        const json = await res.json();
+        setTopupRequests(json.requests ?? []);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setTopupLoading(false);
+    }
+  }, [fetchRef]);
+
+  useEffect(() => {
+    void loadTopupRequests();
+  }, [loadTopupRequests]);
+
+  const handleTopUpSubmit = useCallback(async (amount: number, note: string) => {
+    const res = await fetchRef.current("/api/v1/kasir/topup-requests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount, note }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message ?? "Gagal submit permintaan");
+    }
+    await loadTopupRequests();
+  }, [fetchRef, loadTopupRequests]);
 
   useEffect(() => {
     let alive = true;
@@ -91,7 +144,8 @@ export default function KasirDashboard({ authFetch }: { authFetch: (path: string
   const claimRate = week.receipts > 0 ? Math.round((week.claimed / week.receipts) * 100) : null;
 
   return (
-    <section className="space-y-4 print:hidden">
+    <>
+      <section className="space-y-4 print:hidden">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-50">Dashboard {data.cafe.name}</h2>
@@ -143,9 +197,18 @@ export default function KasirDashboard({ authFetch }: { authFetch: (path: string
               : "border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
           }`}
         >
-          <p className={`text-[11px] font-semibold uppercase tracking-wide ${lowBalance ? "text-amber-700 dark:text-amber-400" : "text-primary"}`}>
-            {lowBalance ? "⚠ Saldo prepaid menipis" : "Saldo prepaid cafe"}
-          </p>
+          <div className="flex items-center justify-between">
+            <p className={`text-[11px] font-semibold uppercase tracking-wide ${lowBalance ? "text-amber-700 dark:text-amber-400" : "text-primary"}`}>
+              {lowBalance ? "⚠ Saldo prepaid menipis" : "Saldo prepaid cafe"}
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowTopUpModal(true)}
+              className={`${btnCls} text-xs py-1.5`}
+            >
+              <Plus size={12} className="mr-1" /> Minta Top-up
+            </button>
+          </div>
           <p className="mt-2 text-2xl font-bold tabular-nums text-neutral-900 dark:text-neutral-50">{n(data.cafe.token_balance)}</p>
           <p className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
             {days_left === null
@@ -300,9 +363,159 @@ export default function KasirDashboard({ authFetch }: { authFetch: (path: string
               </ul>
             )}
           </div>
+
+          <div className={`${card} p-4`}>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-50">Permintaan Top-up</p>
+              <button
+                type="button"
+                onClick={() => setShowTopUpModal(true)}
+                className={`${btnCls} text-xs py-1.5`}
+              >
+                <Plus size={12} className="mr-1" /> Minta Top-up
+              </button>
+            </div>
+            {topupLoading ? (
+              <p className="mt-3 text-xs text-neutral-400 text-center">Memuat...</p>
+            ) : topupRequests.length === 0 ? (
+              <p className="mt-3 text-xs text-neutral-400">Belum ada permintaan top-up.</p>
+            ) : (
+              <ul className="mt-2 divide-y divide-neutral-100 text-xs dark:divide-neutral-800">
+                {topupRequests.slice(0, 5).map((r) => {
+                  const status = TOPUP_STATUS_LABEL[r.status];
+                  return (
+                    <li key={r.id} className="flex items-center justify-between gap-3 py-2">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-neutral-800 dark:text-neutral-100">Minta top-up {n(r.amount)} token</p>
+                        <p className="truncate text-[10px] text-neutral-400">{when(r.created_at)}</p>
+                        {r.note && <p className="truncate text-[10px] text-neutral-500">{r.note}</p>}
+                        {r.status === "rejected" && r.rejection_reason && (
+                          <p className="truncate text-[10px] text-red-500">Alasan: {r.rejection_reason}</p>
+                        )}
+                      </div>
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold border ${status.cls}`}>
+                        {status.label}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
         </div>
       </div>
     </section>
+    {showTopUpModal && (
+      <TopUpRequestModal
+        isOpen={showTopUpModal}
+        onClose={() => setShowTopUpModal(false)}
+        onSubmit={handleTopUpSubmit}
+        balance={data.cafe.token_balance}
+        lowBalance={lowBalance}
+      />
+    )}
+    </>
+  );
+}
+
+function TopUpRequestModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  balance,
+  lowBalance,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (amount: number, note: string) => void;
+  balance: number;
+  lowBalance: boolean;
+}) {
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amt = Number(amount);
+    if (!Number.isInteger(amt) || amt < 1 || amt > 100_000_000) {
+      setError("Jumlah 1–100.000.000 token.");
+      return;
+    }
+    setError("");
+    setBusy(true);
+    try {
+      await onSubmit(amt, note.trim());
+      onClose();
+      setAmount("");
+      setNote("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Gagal submit");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="w-full max-w-md bg-white dark:bg-neutral-900 rounded-2xl shadow-xl p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-neutral-900 dark:text-white">Minta Top-up Saldo Cafe</h3>
+          <button onClick={onClose} className="p-1 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"><X size={20} /></button>
+        </div>
+
+        <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-4">
+          Saldo saat ini: <strong>{n(balance)} token</strong>
+          {lowBalance && <span className="text-amber-600 dark:text-amber-400 ml-2">(Menipis)</span>}
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/60 dark:text-red-200">
+              {error}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Jumlah token <span className="text-red-500">*</span></label>
+            <input
+              type="number"
+              min="1"
+              max="100000000"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="cth. 50000"
+              className={`${inputCls} mt-1`}
+              autoFocus
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Catatan (opsional)</label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="cth. Restok mingguan, promo akhir bulan..."
+              rows={3}
+              maxLength={200}
+              className={`${inputCls} mt-1`}
+            />
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <button type="button" onClick={onClose} disabled={busy} className="flex-1 rounded-lg border border-neutral-200 bg-white px-4 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700">
+              Batal
+            </button>
+            <button type="submit" disabled={busy} className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50">
+              {busy ? <Loader2 size={16} className="mx-auto animate-spin" /> : <>Kirim Permintaan</>}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 

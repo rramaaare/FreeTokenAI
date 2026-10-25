@@ -3,7 +3,6 @@
 import {
   ChevronDown,
   ChevronUp,
-  Code2,
   ImageIcon,
   PanelLeftClose,
   PanelLeftOpen,
@@ -27,7 +26,6 @@ import { DEFAULT_PROFILE, fetchProfile, getProfile, SETTINGS_CHANGED, type UserP
 const navItems: { label: TKey; icon: typeof ImageIcon; href: string }[] = [
   { label: "sidebar.image", icon: ImageIcon, href: "/dashboard/image" },
   { label: "sidebar.video", icon: VideoIcon, href: "/dashboard/video" },
-  { label: "sidebar.developer", icon: Code2, href: "/dashboard/developer" },
 ];
 
 export default function Sidebar({ open, onClose }: { open?: boolean; onClose?: () => void }) {

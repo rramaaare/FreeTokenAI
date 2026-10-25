@@ -9,8 +9,8 @@ const sql =
   postgres(process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5433/freetokenai_dev", {
     // Vercel/serverless: 1 koneksi per instance, dan Neon pooler (PgBouncer
     // transaction mode) tidak mendukung prepared statement bernama.
-    // Di host long-running (VPS) boleh balik ke max: 10 tanpa prepare:false.
-    max: 1,
+    // Di host long-running (VPS) pakai max: 10 agar support concurrent requests.
+    max: 10,
     prepare: false,
     idle_timeout: 20,
   });

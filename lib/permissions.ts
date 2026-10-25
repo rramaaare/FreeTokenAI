@@ -28,7 +28,6 @@ export const PERMISSIONS = [
   { key: 'kasir.crud', label: 'Kelola akun kasir & admin', description: 'Buat, ubah, nonaktifkan akun; tambah saldo pelanggan manual.', ...ADMIN },
   { key: 'package.manage', label: 'Master paket token', description: 'Paket global / per kafe untuk kasir.', ...ADMIN },
   { key: 'tx.view', label: 'Dashboard & riwayat transaksi semua kafe', description: 'Ledger saldo kafe seluruh sistem.', ...ADMIN },
-  { key: 'apikey.manage', label: 'Pantau & cabut API key pelanggan', description: 'Daftar key Developer pelanggan dan pencabutannya.', ...ADMIN },
   { key: 'model.manage', label: 'Provider AI & model', description: 'API key provider (terenkripsi), katalog model & biaya Token.', ...ADMIN },
 
   { key: 'receipt.product', label: 'Buat struk Beli Produk', description: 'Bonus token dari total belanja.', ...KASIR },
@@ -40,7 +39,6 @@ export const PERMISSIONS = [
   { key: 'ai.chat', label: 'Chat AI', description: 'Memakai chat di dashboard.', ...CUSTOMER },
   { key: 'ai.image', label: 'Generate gambar', description: 'Membuat gambar dari teks.', ...CUSTOMER },
   { key: 'ai.video', label: 'Generate video', description: 'Membuat video dari teks / gambar.', ...CUSTOMER },
-  { key: 'ai.developer', label: 'Developer API', description: 'Membuat API key sendiri dan memanggil gateway AI.', ...CUSTOMER },
 ] as const satisfies readonly PermissionDef[];
 
 export type PermissionKey = (typeof PERMISSIONS)[number]['key'];

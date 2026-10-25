@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { permissionDenied } from "@/lib/permissions";
 import { chatCost, InsufficientKeyQuotaError, InsufficientTokensError, insufficient, validateApiKey, withKeyTokens, withTokens } from "@/lib/billing";
 import { modelCost, providerKey } from "@/lib/model-registry";
 import { fetchRetryOnce } from "@/lib/obs";
@@ -34,8 +33,6 @@ export async function POST(req: Request) {
   const valid = await validateApiKey(apiKey);
   if (!valid)
     return gatekeeperAccessResponse("developer_api", "API key tidak dikenal / nonaktif.");
-  const denied = await permissionDenied("customer", "ai.developer");
-  if (denied) return denied;
   // ponytail: rate-limit SETELAH lookup, kunci = api_key_id (uuid aman log).
   if (await rateLimited(`gw:${valid.id}`))
     return NextResponse.json(

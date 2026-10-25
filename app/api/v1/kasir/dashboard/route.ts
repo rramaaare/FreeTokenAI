@@ -57,8 +57,9 @@ export async function GET(req: Request) {
     );
 
   try {
-    // token struk kedaluwarsa kembali ke saldo cafe sebelum angka saldo dibaca.
-    await sweepExpiredReceipts(cafeId);
+    // token struk kedaluwarsa kembali ke saldo cafe — jalankan async non-blocking
+    // supaya dashboard tidak lambat/timeout kalau banyak struk expired.
+    void sweepExpiredReceipts(cafeId);
     const cafes = (await sql`
       SELECT id, name, prepaid_token_balance::int AS token_balance, is_active
       FROM cafes WHERE id = ${cafeId} LIMIT 1`) as unknown as {
