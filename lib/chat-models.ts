@@ -8,12 +8,3 @@ export const CHAT_MODELS: { id: string; label: string }[] = [
 ];
 
 export const DEFAULT_CHAT_MODEL: string = CHAT_MODELS[0].id;
-
-// ponytail: id Groq selalu "org/nama", Gemini tidak pakai slash.
-export function isGroqModel(id: string) {
-  return id.includes("/");
-}
-
-export function isKnownChatModel(id: string) {
-  return CHAT_MODELS.some((m) => m.id === id);
-}

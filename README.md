@@ -137,7 +137,7 @@ curl -X POST $BASE/api/v1/chat/completions -H "Authorization: Bearer rst_live_xx
   -d '{"model":"freetokenai-chat-fast","messages":[{"role":"user","content":"Halo!"}]}'
 ```
 
-Model: `freetokenai-chat-fast`, `freetokenai-chat-pro`.
+Model yang bisa dipanggil = model yang dicentang **Agent (API)** di `/admin/models` (Groq, Gemini, atau provider OpenAI-compatible lain). Daftarnya: `GET /api/v1/models?kind=agent`. Alias lama `freetokenai-chat-fast` / `freetokenai-chat-pro` tetap diterima.
 
 ---
 

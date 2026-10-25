@@ -3,7 +3,7 @@ import { requireAdmin } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { invalidateRegistry, parseCapabilities, type ModelKind } from "@/lib/model-registry";
 
-const KINDS: ModelKind[] = ["chat", "image", "video"];
+const KINDS: ModelKind[] = ["chat", "image", "video", "agent"];
 
 function forbidden(auth: unknown) {
   if (typeof auth !== "string") return null;
@@ -59,7 +59,7 @@ export async function POST(req: Request) {
   const parsed = parseCapabilities(requested);
   const kinds = parsed.filter((k) => KINDS.includes(k));
   if (!kinds.length)
-    return NextResponse.json({ error: { code: "INVALID_KIND", message: "Pilih minimal satu: chat | image | video." } }, { status: 400 });
+    return NextResponse.json({ error: { code: "INVALID_KIND", message: "Pilih minimal satu: chat | image | video | agent." } }, { status: 400 });
 
   // provider: id langsung (dari kartu) atau slug (mode lama)
   let providerId: string | null = null;
@@ -74,7 +74,8 @@ export async function POST(req: Request) {
   }
 
   // Ceklis murni per model — tidak dibatasi capability provider.
-  const primary = kinds[0];
+  // Kolom kind (lama) hanya chat/image/video; model khusus agent tetap disimpan sebagai chat.
+  const primary = kinds.find((k) => k !== "agent") ?? "chat";
 
   // mode massal: [{model_id, label?}, ...]
   if (Array.isArray(body.models)) {

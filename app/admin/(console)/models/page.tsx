@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { Alert, PageHeader } from '@/components/admin/ui';
 
-type Kind = 'chat' | 'image' | 'video';
+type Kind = 'chat' | 'image' | 'video' | 'agent';
 
 type Provider = {
   id: string;
@@ -45,8 +45,9 @@ type ModelRow = {
   is_default: boolean;
 };
 
-const KIND_LABEL: Record<Kind, string> = { chat: 'Chat', image: 'Gambar', video: 'Video' };
-const KINDS: Kind[] = ['chat', 'image', 'video'];
+// Agent = model bisa dipanggil pelanggan lewat Developer API (/api/v1/chat/completions).
+const KIND_LABEL: Record<Kind, string> = { chat: 'Chat', image: 'Gambar', video: 'Video', agent: 'Agent (API)' };
+const KINDS: Kind[] = ['chat', 'image', 'video', 'agent'];
 
 // Notifikasi hilang sendiri: sukses lebih cepat, error diberi waktu lebih lama.
 const NOTICE_MS = 5_000;

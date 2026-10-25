@@ -1,22 +1,22 @@
 import { NextResponse } from "next/server";
-import { chatCost, InsufficientKeyQuotaError, InsufficientTokensError, insufficient, validateApiKey, withKeyTokens, withTokens } from "@/lib/billing";
-import { modelCost, providerKey } from "@/lib/model-registry";
-import { fetchRetryOnce } from "@/lib/obs";
+import { permissionDenied } from "@/lib/permissions";
+import { chatComplete, resolveRoute } from "@/lib/ai-router";
+import { InsufficientKeyQuotaError, InsufficientTokensError, insufficient, validateApiKey, withKeyTokens, withTokens } from "@/lib/billing";
+import { defaultModel, listModels } from "@/lib/model-registry";
 import { rateLimited } from "@/lib/rate-limit";
 import { evaluateAiRequest, gatekeeperAccessResponse, gatekeeperBlockResponse } from "@/lib/gatekeeper";
 
 // ponytail: gateway publik (PRD 7.3: POST /v1/chat/completions, key rst_live_*).
 // Format-valid -> hash SHA-256 ke api_keys DB -> rate-limit Redis 60/mnt by
 // api_key_id (PRD §5.2 `rl:{api_key_id}:{minute}`, raw secret tak pernah ke Redis) ->
-// deduct atomik + usage-extend (402 bila kurang) -> Groq -> refund bila vendor gagal.
+// deduct atomik + usage-extend (402 bila kurang) -> provider model agent -> refund bila vendor gagal.
 // Bentuk request/response ikut OpenAI agar AI agent langsung bisa pakai.
 
-// ponytail: PRD 6 — model katalog dipetakan ke provider gratis yang sudah terbukti hidup.
-const MODEL_MAP: Record<string, string> = {
+// Model yang boleh dipanggil = model berceklis "Agent (API)" di /admin/models.
+// Alias lama tetap diterima supaya integrasi pelanggan yang sudah jalan tidak putus.
+const LEGACY_ALIAS: Record<string, string> = {
   "freetokenai-chat-fast": "openai/gpt-oss-20b",
   "freetokenai-chat-pro": "openai/gpt-oss-120b",
-  "openai/gpt-oss-20b": "openai/gpt-oss-20b",
-  "openai/gpt-oss-120b": "openai/gpt-oss-120b",
 };
 
 type Msg = { role?: unknown; content?: unknown };
@@ -33,6 +33,8 @@ export async function POST(req: Request) {
   const valid = await validateApiKey(apiKey);
   if (!valid)
     return gatekeeperAccessResponse("developer_api", "API key tidak dikenal / nonaktif.");
+  const denied = await permissionDenied("customer", "ai.developer");
+  if (denied) return denied;
   // ponytail: rate-limit SETELAH lookup, kunci = api_key_id (uuid aman log).
   if (await rateLimited(`gw:${valid.id}`))
     return NextResponse.json(
@@ -63,52 +65,43 @@ export async function POST(req: Request) {
     .join("\n");
   const gate = gatekeeperBlockResponse(evaluateAiRequest(gateInput, "developer_api"));
   if (gate) return gate;
-  const modelId = String(body.model ?? "freetokenai-chat-fast");
-  const groqModel = MODEL_MAP[modelId] ?? null;
-  if (!groqModel)
+  const requested = typeof body.model === "string" && body.model.trim() ? body.model.trim() : null;
+  const agentModels = await listModels("agent");
+  const target = requested ? (LEGACY_ALIAS[requested] ?? requested) : await defaultModel("agent");
+  const model = agentModels.find((x) => x.model_id === target);
+  if (!model)
     return NextResponse.json(
       {
         error: {
           code: "INVALID_MODEL",
-          message: "Model tidak dikenal. Pakai: freetokenai-chat-fast, freetokenai-chat-pro.",
+          message: agentModels.length
+            ? `Model tidak tersedia untuk API. Pakai salah satu: ${agentModels.map((x) => x.model_id).join(", ")}.`
+            : "Belum ada model yang diaktifkan untuk Developer API.",
         },
       },
       { status: 400 },
     );
 
-  const key = (await providerKey("groq")) ?? process.env.GROQ_API_KEY;
-  if (!key)
+  const route = await resolveRoute(model.model_id, "agent");
+  if (!route)
     return NextResponse.json(
-      { error: { code: "NO_API_KEY", message: "API key Groq belum diisi (menu Provider & Model AI di /admin)." } },
+      { error: { code: "NO_API_KEY", message: "API key provider model ini belum diisi (menu Provider & Model AI di /admin)." } },
       { status: 500 },
     );
-  const history = messages.slice(0, -1).slice(-20).map((x) => ({
-    role: x.role === "assistant" ? "assistant" : "user",
-    content: String(x.content ?? "").slice(0, 8000),
-  }));
-  const cost = (await modelCost("chat", groqModel)) ?? chatCost(modelId);
+  const modelId = requested ?? model.model_id;
+  const cost = model.cost;
   const callProvider = async () => {
-    // ponytail: NFR#6 — retry 1x transient; gagal akhir -> refund di billing.
-    const res = await fetchRetryOnce("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-      body: JSON.stringify({
-        model: groqModel,
-        messages: [
-          { role: "system", content: "Jawab dalam Bahasa Indonesia yang ringkas dan membantu." },
-          ...history,
-          { role: "user", content: message },
-        ],
-      }),
-      cache: "no-store",
+    const out = await chatComplete(route, {
+      system: "Jawab dalam Bahasa Indonesia yang ringkas dan membantu.",
+      message,
+      history: messages.slice(0, -1),
     });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok)
+    if (!out.ok)
       return NextResponse.json(
-        { error: { code: "PROVIDER_ERROR", message: data?.error?.message ?? "Groq error" } },
-        { status: 502 },
+        { error: { code: "PROVIDER_ERROR", message: out.message } },
+        { status: out.status },
       );
-    const reply = String(data?.choices?.[0]?.message?.content ?? "").trim();
+    const reply = out.reply;
     // ponytail: bentuk OpenAI — agent tak perlu adaptor khusus.
     return NextResponse.json({
       id: `chatcmpl-dev-${Date.now()}`,

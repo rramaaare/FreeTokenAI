@@ -307,18 +307,6 @@ export async function requireAuth(req: Request): Promise<AuthContext | null> {
   return sid ? authBySessionId(sid) : null;
 }
 
-export async function requireSuperAdmin(req: Request): Promise<AuthContext | null> {
-  const auth = await requireAuth(req);
-  if (!auth || auth.user.role !== 'super_admin') return null;
-  return auth;
-}
-
-export async function getServerSession(): Promise<AuthContext | null> {
-  const cookieStore = await cookies();
-  const sid = cookieStore.get(SESSION_COOKIE)?.value;
-  return sid ? authBySessionId(sid) : null;
-}
-
 // Sesi web console admin (cookie terpisah dari customer).
 export async function getAdminServerSession(): Promise<AuthContext | null> {
   const cookieStore = await cookies();

@@ -3,6 +3,7 @@
 import {
   ChevronDown,
   ChevronUp,
+  Code2,
   ImageIcon,
   PanelLeftClose,
   PanelLeftOpen,
@@ -18,7 +19,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CHAT_CHANGED, CHAT_NEW, deleteChatSession, hydrateSessions, listChatSessions, type ChatSession } from "@/lib/chat-history";
-import { CHAT_JOBS_CHANGED } from "@/lib/chat-jobs";
 import { CURRENT_USER_CHANGED, isUserResolved } from "@/lib/current-user";
 import { useT, type TKey } from "@/lib/i18n";
 import { DEFAULT_PROFILE, fetchProfile, getProfile, SETTINGS_CHANGED, type UserProfile } from "@/lib/settings";
@@ -26,6 +26,7 @@ import { DEFAULT_PROFILE, fetchProfile, getProfile, SETTINGS_CHANGED, type UserP
 const navItems: { label: TKey; icon: typeof ImageIcon; href: string }[] = [
   { label: "sidebar.image", icon: ImageIcon, href: "/dashboard/image" },
   { label: "sidebar.video", icon: VideoIcon, href: "/dashboard/video" },
+  { label: "sidebar.developer", icon: Code2, href: "/dashboard/developer" },
 ];
 
 export default function Sidebar({ open, onClose }: { open?: boolean; onClose?: () => void }) {
@@ -52,7 +53,6 @@ export default function Sidebar({ open, onClose }: { open?: boolean; onClose?: (
     };
     if (isUserResolved()) onUser();
     window.addEventListener(CHAT_CHANGED, sync);
-    window.addEventListener(CHAT_JOBS_CHANGED, () => void hydrateSessions());
     window.addEventListener(SETTINGS_CHANGED, sync);
     window.addEventListener("storage", sync);
     window.addEventListener(CURRENT_USER_CHANGED, onUser);

@@ -9,3 +9,6 @@ dev.log
 dev.err.log
 check_ts.txt
 .sokudo
+
+# paket upload cPanel (hasil scripts/build-cpanel.mjs)
+/deploy/

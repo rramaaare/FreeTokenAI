@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import type { LucideIcon } from 'lucide-react';
 import {
   Bell,
+  KeyRound,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -46,6 +47,7 @@ const NAV: Record<ConsoleRole, NavGroup[]> = {
     {
       label: 'Sistem',
       items: [
+        { href: '/admin/api-keys', label: 'API Key Pelanggan', icon: KeyRound },
         { href: '/admin/models', label: 'Provider & Model AI', icon: SlidersHorizontal },
         { href: '/admin/rbac', label: 'Peran & Hak Akses', icon: ShieldCheck },
       ],

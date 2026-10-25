@@ -110,13 +110,6 @@ export type BillingMeta = {
   onUsageLogged?: (usageId: string) => void;
 };
 
-export async function balanceOf(workspaceId: string): Promise<number> {
-  const rows = (await sql`SELECT token_balance FROM workspaces WHERE id = ${workspaceId}`) as unknown as {
-    token_balance: number;
-  }[];
-  return rows[0]?.token_balance ?? 0;
-}
-
 type Deduction = { balance: number; ledgerId: string };
 
 // deduct gagal karena saldo kurang ATAU masa aktif lewat (race dengan assertActive).

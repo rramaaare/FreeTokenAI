@@ -4,14 +4,14 @@ import { listModels, listProviders, type ModelKind } from "@/lib/model-registry"
 // Selalu dinamis: katalog berubah setiap admin menambah model / mengganti ceklis.
 export const dynamic = "force-dynamic";
 
-// Katalog model untuk picker user (chat/gambar/video).
+// Katalog model untuk picker user (chat/gambar/video) dan daftar model Developer API (agent).
 // Sumbernya HANYA katalog platform yang dikelola super_admin di /admin/models.
 // Hanya metadata — TIDAK ada API key di dalamnya.
 export async function GET(req: Request) {
   const kind = new URL(req.url).searchParams.get("kind")?.trim();
-  if (kind && !["chat", "image", "video"].includes(kind))
+  if (kind && !["chat", "image", "video", "agent"].includes(kind))
     return NextResponse.json(
-      { error: { code: "INVALID_KIND", message: "kind harus chat | image | video." } },
+      { error: { code: "INVALID_KIND", message: "kind harus chat | image | video | agent." } },
       { status: 400 },
     );
   const selected = kind as ModelKind | undefined;

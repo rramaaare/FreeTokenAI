@@ -294,23 +294,9 @@ const id = {
   "dev.usagePre":
     "Bentuk OpenAI-compatible — LangChain / Vercel AI SDK / curl langsung jalan. Base URL = asal dashboard ini + ",
   "dev.usagePost": ". Limit 60 req/menit/key (PRD 5.2).",
-  "dev.modelsTitle": "Model gratis yang disarankan",
-  "dev.free1.use": "Chat cepat / AI agent default",
-  "dev.free1.id": "freetokenai-chat-fast → openai/gpt-oss-20b",
-  "dev.free1.why":
-    "Gratis di free-tier Groq, limit murah hati, terbukti 200 di repo ini. 1 Token / 1K token-LLM (PRD 6).",
-  "dev.free2.use": "Chat reasoning / analisis kompleks",
-  "dev.free2.id": "freetokenai-chat-pro → openai/gpt-oss-120b",
-  "dev.free2.why":
-    "Gratis juga di Groq, lebih pintar tapi lebih lambat. 10 Token / 1K token-LLM (PRD 6).",
-  "dev.free3.use": "Fallback kalau Groq down",
-  "dev.free3.id": "gemini-3.5-flash (langsung, bukan via gateway)",
-  "dev.free3.why":
-    "Free-tier Google AI Studio; kadang 503 high-demand — route /api/chat otomatis fallback ke Groq.",
-  "dev.free4.use": "Gambar termurah",
-  "dev.free4.id": "nano-banana-2 / veo-3.1-lite (Vio, berbayar)",
-  "dev.free4.why":
-    "Vio TIDAK punya tier gratis — tiap request motong kredit. Paling murah: gambar 3 kredit, video veo-3.1-lite 5 kredit. Alternatif benar-benar gratis: Pollinations.ai (gambar saja, kualitas kurang).",
+  "dev.modelsTitle": "Model yang tersedia untuk API",
+  "dev.modelsEmpty": "Belum ada model yang diaktifkan admin untuk API.",
+  "dev.modelCost": "{cost} Token / request",
 
   // claim page
   "claim.successTitle": "Token berhasil diklaim",
@@ -606,23 +592,9 @@ const en: Record<keyof typeof id, string> = {
   "dev.usagePre":
     "OpenAI-compatible — LangChain / Vercel AI SDK / curl works out of the box. Base URL = this dashboard origin + ",
   "dev.usagePost": ". Limit 60 req/min/key (PRD 5.2).",
-  "dev.modelsTitle": "Recommended free models",
-  "dev.free1.use": "Fast chat / default AI agent",
-  "dev.free1.id": "freetokenai-chat-fast → openai/gpt-oss-20b",
-  "dev.free1.why":
-    "Free on Groq's free tier, generous limits, verified 200 in this repo. 1 Token / 1K LLM tokens (PRD 6).",
-  "dev.free2.use": "Reasoning chat / complex analysis",
-  "dev.free2.id": "freetokenai-chat-pro → openai/gpt-oss-120b",
-  "dev.free2.why":
-    "Also free on Groq, smarter but slower. 10 Tokens / 1K LLM tokens (PRD 6).",
-  "dev.free3.use": "Fallback if Groq is down",
-  "dev.free3.id": "gemini-3.5-flash (direct, not via gateway)",
-  "dev.free3.why":
-    "Google AI Studio free tier; sometimes 503 high-demand — the /api/chat route falls back to Groq automatically.",
-  "dev.free4.use": "Cheapest image",
-  "dev.free4.id": "nano-banana-2 / veo-3.1-lite (Vio, paid)",
-  "dev.free4.why":
-    "Vio has NO free tier — every request consumes credits. Cheapest: 3 credits for images, 5 credits for veo-3.1-lite video. Truly free alternative: Pollinations.ai (images only, lower quality).",
+  "dev.modelsTitle": "Models available via API",
+  "dev.modelsEmpty": "The admin hasn't enabled any models for the API yet.",
+  "dev.modelCost": "{cost} Tokens / request",
 
   "claim.successTitle": "Tokens claimed successfully",
   "claim.successDesc":

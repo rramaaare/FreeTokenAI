@@ -4,7 +4,8 @@
 import { sql } from "./db";
 import { decryptSecret } from "./secret-box";
 
-export type ModelKind = "chat" | "image" | "video";
+// agent = boleh dipanggil lewat Developer API (/api/v1/chat/completions) oleh AI agent pelanggan.
+export type ModelKind = "chat" | "image" | "video" | "agent";
 
 export type RegistryModel = {
   id: string;
@@ -302,7 +303,7 @@ export async function testProviderKey(
 }
 
 // ---- tarik daftar model OTOMATIS dari provider (ala OpenRouter) -------------
-export const MODEL_KINDS: ModelKind[] = ["chat", "image", "video"];
+export const MODEL_KINDS: ModelKind[] = ["chat", "image", "video", "agent"];
 
 /** Normalisasi input capabilities dari client -> daftar kind valid (unik). */
 export function parseCapabilities(raw: unknown): ModelKind[] {
