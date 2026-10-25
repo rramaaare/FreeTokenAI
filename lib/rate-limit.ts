@@ -17,6 +17,8 @@ function memLimited(key: string, limit: number, windowSec: number): boolean {
 }
 
 export async function rateLimited(key: string, limit = 60, windowSec = 60): Promise<boolean> {
+  // REDIS_URL kosong (mis. shared hosting) -> langsung in-memory, jangan tunggu retry koneksi.
+  if (!process.env.REDIS_URL) return memLimited(key, limit, windowSec);
   const win = Math.floor(Date.now() / (windowSec * 1000));
   try {
     const n = await redis.incr(`rl:${key}:${win}`);
