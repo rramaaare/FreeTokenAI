@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { extendedExpiry } from "@/lib/billing";
 import { sql } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { logAudit } from "@/lib/permissions";
@@ -76,10 +77,7 @@ export async function POST(
         ws = (await tx`
           UPDATE workspaces
           SET token_balance = token_balance + ${amount},
-              expires_at = CASE
-                WHEN expires_at < now() THEN now() + interval '7 days'
-                ELSE expires_at
-              END
+              expires_at = ${extendedExpiry()}
           WHERE id = ${ws[0].id}
           RETURNING id, token_balance, cafe_id`) as unknown as Array<{
           id: string;

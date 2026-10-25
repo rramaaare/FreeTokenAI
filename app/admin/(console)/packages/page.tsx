@@ -142,7 +142,7 @@ export default function AdminPackagesPage() {
     <div className="mx-auto max-w-6xl space-y-6">
       <PageHeader
         title="Master Paket Kuota"
-        description="Atur paket token, harga, dan masa berlaku default."
+        description="Paket token yang dijual kasir sebagai “paket hemat”. Global = berlaku di semua kafe; pilih kafe = hanya kafe itu."
         icon={<Package size={22} className="text-primary" />}
         action={
           <button
@@ -172,7 +172,6 @@ export default function AdminPackagesPage() {
                   <th className="px-4 py-3 font-semibold">Harga (Rp)</th>
                   <th className="px-4 py-3 font-semibold">Token</th>
                   <th className="px-4 py-3 font-semibold">Cafe</th>
-                  <th className="px-4 py-3 font-semibold">Expiry (hari)</th>
                   <th className="px-4 py-3 font-semibold">Status</th>
                   <th className="px-4 py-3 font-semibold text-right">Aksi</th>
                 </tr>
@@ -184,7 +183,6 @@ export default function AdminPackagesPage() {
                     <td className="px-4 py-3.5 text-xs">{p.rupiah_amount.toLocaleString('id-ID')}</td>
                     <td className="px-4 py-3.5 text-xs">{p.tokens_granted.toLocaleString('id-ID')}</td>
                     <td className="px-4 py-3.5 text-xs">{p.cafe_id ? (cafes.find((c) => c.id === p.cafe_id)?.name || '-') : 'Global'}</td>
-                    <td className="px-4 py-3.5 text-xs">{p.default_expires_days} (maks {p.max_expires_days})</td>
                     <td className="px-4 py-3.5">
                       <Badge tone={p.is_active ? 'success' : 'neutral'}>{p.is_active ? 'Aktif' : 'Nonaktif'}</Badge>
                     </td>
@@ -246,16 +244,6 @@ export default function AdminPackagesPage() {
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Expiry Default (hari)</label>
-                  <input type="number" min={1} value={form.default_expires_days} onChange={(e) => setForm({ ...form, default_expires_days: Number(e.target.value) })} className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-900 px-3 py-2 text-neutral-900 dark:text-white outline-none focus:border-primary" />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Expiry Maks (hari)</label>
-                  <input type="number" min={1} value={form.max_expires_days} onChange={(e) => setForm({ ...form, max_expires_days: Number(e.target.value) })} className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-900 px-3 py-2 text-neutral-900 dark:text-white outline-none focus:border-primary" />
-                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>

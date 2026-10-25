@@ -117,7 +117,7 @@ export default function AdminModelsPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader
-        title="Model & API Key"
+        title="Provider & Model AI"
         description="Tambah provider — semua model ditarik otomatis. Ceklis Chat/Gambar/Video diatur per model."
         icon={<Sparkles size={22} className="text-primary" />}
         action={

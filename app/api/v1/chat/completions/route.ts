@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { permissionDenied } from "@/lib/permissions";
 import { chatCost, InsufficientKeyQuotaError, InsufficientTokensError, insufficient, validateApiKey, withKeyTokens, withTokens } from "@/lib/billing";
 import { modelCost, providerKey } from "@/lib/model-registry";
 import { fetchRetryOnce } from "@/lib/obs";
@@ -33,6 +34,8 @@ export async function POST(req: Request) {
   const valid = await validateApiKey(apiKey);
   if (!valid)
     return gatekeeperAccessResponse("developer_api", "API key tidak dikenal / nonaktif.");
+  const denied = await permissionDenied("customer", "ai.developer");
+  if (denied) return denied;
   // ponytail: rate-limit SETELAH lookup, kunci = api_key_id (uuid aman log).
   if (await rateLimited(`gw:${valid.id}`))
     return NextResponse.json(
@@ -79,7 +82,7 @@ export async function POST(req: Request) {
   const key = (await providerKey("groq")) ?? process.env.GROQ_API_KEY;
   if (!key)
     return NextResponse.json(
-      { error: { code: "NO_API_KEY", message: "API key Groq belum diisi (menu Model & API Key di /admin)." } },
+      { error: { code: "NO_API_KEY", message: "API key Groq belum diisi (menu Provider & Model AI di /admin)." } },
       { status: 500 },
     );
   const history = messages.slice(0, -1).slice(-20).map((x) => ({
@@ -128,7 +131,7 @@ export async function POST(req: Request) {
       "API key tidak terhubung ke workspace/cafe. Terbitkan key baru dari kasir.",
     );
   } catch (e) {
-    if (e instanceof InsufficientTokensError) return insufficient(e.balance, "developer_api");
+    if (e instanceof InsufficientTokensError) return insufficient(e, "developer_api");
     if (e instanceof InsufficientKeyQuotaError) return insufficient(e.remaining, "developer_api");
     throw e;
   }

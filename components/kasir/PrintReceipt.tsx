@@ -10,6 +10,7 @@ export type PrintableReceipt = {
   purchase_type: string | null;
   rupiah_amount: number | null;
   created_at: string;
+  expires_at?: string | null;
   pos_reference_id?: string | null;
   cafe_name?: string | null;
 };
@@ -26,7 +27,8 @@ const TYPE_LABEL: Record<string, string> = {
 export default function PrintReceipt({ receipt, cashier }: { receipt: PrintableReceipt; cashier?: string }) {
   const qr = `/api/v1/receipts/${encodeURIComponent(receipt.code)}/qr.png`;
   const label = TYPE_LABEL[receipt.purchase_type ?? "manual"] ?? "Token";
-  const created = new Date(receipt.created_at).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
+  const fmt = (v: string) => new Date(v).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
+  const created = fmt(receipt.created_at);
 
   return (
     <div className="space-y-3">
@@ -45,6 +47,7 @@ export default function PrintReceipt({ receipt, cashier }: { receipt: PrintableR
           <Row k={receipt.purchase_type === "product" ? "Total belanja" : "Harga"} v={idr(receipt.rupiah_amount)} />
         )}
         <Row k="Token" v={`${receipt.tokens.toLocaleString("id-ID")} token`} bold />
+        {receipt.expires_at && <Row k="Klaim sebelum" v={fmt(receipt.expires_at)} bold />}
         <hr className="my-2 border-dashed border-neutral-300" />
         <div className="text-center">
           {/* eslint-disable-next-line @next/next/no-img-element -- PNG dinamis dari API, bukan aset statis */}
@@ -52,7 +55,7 @@ export default function PrintReceipt({ receipt, cashier }: { receipt: PrintableR
           <p className="mt-1 text-base font-bold tracking-widest">{receipt.code}</p>
           <p className="mt-1 text-[10px]">Scan QR atau buka</p>
           <p className="break-all text-[10px]">{receipt.claim_url}</p>
-          <p className="mt-2 text-[10px] text-neutral-500">Token berlaku 7 hari sejak diklaim. Satu kode untuk satu kali klaim.</p>
+          <p className="mt-2 text-[10px] text-neutral-500">Lewat batas klaim, kode hangus. Klaim menambah masa aktif 7 hari (maks 30 hari). Satu kode untuk satu kali klaim.</p>
         </div>
       </div>
 

@@ -6,33 +6,83 @@ import { requireAuth } from "./auth";
 
 // ponytail: ledger dua arah (PRD §5.2) — burn saat deduct, refund saat refund,
 // masing-masing SATU transaksi sql.begin dengan UPDATE workspaces-nya.
-// usage-extend expires_at TIDAK ikut di-revert saat refund: sengaja (PRD §2/§5.2
-// tak mengatur revert extend; token_balance ter-refund penuh).
 // Jangan return array dari callback sql.begin (itu mode pipeline postgres.js).
+
+// Masa aktif workspace (aturan bisnis Okt 2026):
+//  - isi ulang (klaim struk / top-up admin) = sisa masa aktif + 7 hari,
+//    dihitung dari sekarang bila sudah lewat; dibatasi maks 30 hari ke depan
+//    supaya klaim struk kecil berulang tidak menumpuk masa aktif tanpa batas.
+//  - lewat masa aktif = AI ditolak (saldo tetap ada, aktif lagi saat isi ulang).
+//  - pemakaian TIDAK memperpanjang masa aktif.
+export const WORKSPACE_TOPUP_DAYS = 7;
+export const WORKSPACE_MAX_DAYS = 30;
+
+/** Ekspresi SQL expires_at baru saat isi ulang (dipakai klaim & top-up admin). */
+export function extendedExpiry() {
+  return sql`LEAST(
+    GREATEST(COALESCE(expires_at, now()), now()) + make_interval(days => ${WORKSPACE_TOPUP_DAYS}),
+    now() + make_interval(days => ${WORKSPACE_MAX_DAYS})
+  )`;
+}
+
 export class InsufficientTokensError extends Error {
   balance: number;
+  expired = false;
   constructor(balance: number) {
     super("Saldo Token tidak cukup.");
     this.balance = balance;
   }
 }
 
-export function insufficient(balance: number, service: "chat" | "image" | "video" | "developer_api" = "chat") {
-  const userMessage = `Saldo Token tidak cukup (sisa ${balance}). Klaim QR dulu.`;
+// Turunan InsufficientTokensError supaya semua catch yang sudah ada ikut menanganinya.
+export class WorkspaceExpiredError extends InsufficientTokensError {
+  expired = true;
+  constructor(balance: number) {
+    super(balance);
+    this.message = "Masa aktif workspace habis.";
+  }
+}
+
+export function insufficientMessage(e: { balance: number; expired?: boolean }, lang: "id" | "en" = "id") {
+  if (e.expired)
+    return lang === "en"
+      ? `Your workspace has expired (${e.balance} Tokens left). Claim a new receipt to reactivate it.`
+      : `Masa aktif workspace habis (sisa ${e.balance} Token). Klaim struk baru untuk mengaktifkan lagi.`;
+  return lang === "en"
+    ? `Not enough Tokens (balance ${e.balance}). Claim a receipt first.`
+    : `Saldo Token tidak cukup (sisa ${e.balance}). Klaim struk dulu.`;
+}
+
+export function insufficient(
+  e: number | { balance: number; expired?: boolean },
+  service: "chat" | "image" | "video" | "developer_api" = "chat",
+) {
+  const err = typeof e === "number" ? { balance: e, expired: false } : e;
+  const userMessage = insufficientMessage(err);
   return NextResponse.json(
     {
-      error: { code: "INSUFFICIENT_TOKENS", message: userMessage },
+      error: { code: err.expired ? "WORKSPACE_EXPIRED" : "INSUFFICIENT_TOKENS", message: userMessage },
       gatekeeper: {
         decision: "BLOCK",
         service,
         category: "credit",
         risk_level: "low",
-        reason: "Saldo workspace tidak mencukupi biaya permintaan.",
+        reason: err.expired ? "Masa aktif workspace sudah lewat." : "Saldo workspace tidak mencukupi biaya permintaan.",
         user_message: userMessage,
       },
     },
     { status: 402 },
   );
+}
+
+/** Tolak workspace yang sudah lewat masa aktif (sebelum memanggil provider). */
+async function assertActive(workspaceId: string): Promise<number> {
+  const rows = (await sql`
+    SELECT token_balance, (expires_at IS NOT NULL AND expires_at <= now()) AS expired
+    FROM workspaces WHERE id = ${workspaceId}`) as unknown as { token_balance: number; expired: boolean }[];
+  const balance = rows[0]?.token_balance ?? 0;
+  if (rows[0]?.expired) throw new WorkspaceExpiredError(balance);
+  return balance;
 }
 
 // ponytail: PRD §6 — chat 1/10, image 3/50, video 5/200 (murah vs pro).
@@ -69,12 +119,22 @@ export async function balanceOf(workspaceId: string): Promise<number> {
 
 type Deduction = { balance: number; ledgerId: string };
 
+// deduct gagal karena saldo kurang ATAU masa aktif lewat (race dengan assertActive).
+async function deductFailure(workspaceId: string): Promise<InsufficientTokensError> {
+  try {
+    return new InsufficientTokensError(await assertActive(workspaceId));
+  } catch (e) {
+    if (e instanceof InsufficientTokensError) return e;
+    throw e;
+  }
+}
+
 async function deduct(workspaceId: string, cost: number): Promise<Deduction | null> {
   const out: Deduction | null = await sql.begin(async (tx) => {
     const rows = (await tx`
-      UPDATE workspaces SET token_balance = token_balance - ${cost},
-        expires_at = CASE WHEN expires_at < now() THEN now() + interval '7 days' ELSE expires_at END
+      UPDATE workspaces SET token_balance = token_balance - ${cost}
       WHERE id = ${workspaceId} AND token_balance >= ${cost}
+        AND (expires_at IS NULL OR expires_at > now())
       RETURNING token_balance`) as unknown as { token_balance: number }[];
     if (!rows[0]) return null;
     const led = (await tx`
@@ -111,7 +171,7 @@ async function resolveCafeId(
 
 // ponytail: counter monitoring. Request ber-key -> key itu; request dashboard
 // (tanpa key) -> semua key aktif milik workspace tersebut, supaya angka
-// "terpakai" di Monitoring API Key ikut saldo workspace yang benar-benar burn.
+// "terpakai" di API Key Pelanggan ikut saldo workspace yang benar-benar burn.
 async function syncKeyUsage(
   tx: any,
   workspaceId: string | null,
@@ -172,7 +232,7 @@ async function refund(workspaceId: string, cost: number, meta: BillingMeta, ledg
 
 // ponytail: deduct atomik -> vendor fn() -> sukses catat burn; throw /
 // respons !ok (!=402) vendor catat refund. Jangan tahan transaksi DB selama vendor call.
-// PRD §5.2: deduct + usage-extend satu statement (expired -> +7d, aktif -> tetap).
+// Workspace lewat masa aktif ditolak sebelum provider dipanggil (assertActive).
 export async function withTokens<T extends NextResponse>(
   workspaceId: string,
   baseCost: number,
@@ -180,8 +240,9 @@ export async function withTokens<T extends NextResponse>(
   meta: BillingMeta,
 ): Promise<T> {
   const cost = Math.max(1, Math.ceil(baseCost * (meta.units ?? 1)));
+  await assertActive(workspaceId);
   const deducted = await deduct(workspaceId, cost);
-  if (!deducted) throw new InsufficientTokensError(await balanceOf(workspaceId));
+  if (!deducted) throw await deductFailure(workspaceId);
   // ponytail: NFR#5 — satu log per billed call (choke point semua AI routes).
   const reqId = newRequestId();
   const t0 = Date.now();
@@ -321,7 +382,7 @@ export async function withTokensStream(
   inputChars = 0,
 ): Promise<StreamMeteredResult> {
   const inputTokens = inputChars > 0 ? Math.ceil(inputChars / 4) : 0;
-  const balance = await balanceOf(workspaceId);
+  const balance = await assertActive(workspaceId);
   if (balance < 5) throw new InsufficientTokensError(balance);
 
   const reqId = newRequestId();
@@ -373,7 +434,7 @@ export async function withTokensStream(
 
   if (cost > 0) {
     const deducted = await deduct(workspaceId, cost);
-    if (!deducted) throw new InsufficientTokensError(await balanceOf(workspaceId));
+    if (!deducted) throw await deductFailure(workspaceId);
     await logBurn(workspaceId, cost, meta, deducted.ledgerId);
     done(200, true);
   } else {

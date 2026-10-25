@@ -1,15 +1,8 @@
 "use client";
 
-import { Check, Copy, Eye, Plus, Power, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
-import {
-  API_KEY_CHANGED,
-  deleteApiKey,
-  generateApiKey,
-  listApiKeys,
-  setKeyActive,
-  type DevApiKey,
-} from "@/lib/api-keys";
+import { Ban, Check, Copy, Eye, Plus } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { API_KEY_CHANGED, generateApiKey, listApiKeys, revokeApiKey, type DevApiKey } from "@/lib/api-keys";
 import { useT, type TKey } from "@/lib/i18n";
 
 // ponytail: saran dari hasil tes langsung di repo ini (bukan brosur):
@@ -29,27 +22,51 @@ export default function DeveloperApi() {
   const [justCreated, setJustCreated] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [reveal, setReveal] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   // ponytail: origin di-set setelah mount; baca window saat render = hydration mismatch
   const [origin, setOrigin] = useState("");
 
-  useEffect(() => {
-    const reload = () => setKeys(listApiKeys());
-    reload();
-    setOrigin(window.location.origin);
-    window.addEventListener(API_KEY_CHANGED, reload);
-    window.addEventListener("storage", reload);
-    return () => {
-      window.removeEventListener(API_KEY_CHANGED, reload);
-      window.removeEventListener("storage", reload);
-    };
+  const reload = useCallback(async () => {
+    try {
+      setKeys(await listApiKeys());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Gagal memuat API key");
+    }
   }, []);
 
-  function onGenerate() {
-    const k = generateApiKey(name || "Default Key");
-    setName("");
-    setJustCreated(k.full_key);
-    setCopied(false);
-    setReveal(false);
+  useEffect(() => {
+    void reload();
+    setOrigin(window.location.origin);
+    const onChange = () => void reload();
+    window.addEventListener(API_KEY_CHANGED, onChange);
+    return () => window.removeEventListener(API_KEY_CHANGED, onChange);
+  }, [reload]);
+
+  async function onGenerate() {
+    setBusy(true);
+    setError("");
+    try {
+      const out = await generateApiKey(name || "Default Key");
+      setName("");
+      setJustCreated(out.key);
+      setCopied(false);
+      setReveal(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Gagal membuat API key");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onRevoke(k: DevApiKey) {
+    if (!window.confirm(t("dev.revokeConfirm", { name: k.name }))) return;
+    setError("");
+    try {
+      await revokeApiKey(k.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Gagal mencabut API key");
+    }
   }
 
   async function copy(text: string) {
@@ -62,7 +79,8 @@ export default function DeveloperApi() {
     }
   }
 
-  const activeKey = justCreated ?? keys.find((k) => k.is_active)?.full_key ?? "rst_live_TEMPEL_KEY_DISINI";
+  // key lengkap hanya diketahui sesaat setelah dibuat (server cuma simpan hash-nya).
+  const activeKey = justCreated ?? "rst_live_TEMPEL_KEY_DISINI";
   const curl = `curl -X POST ${origin}/api/v1/chat/completions \\
   -H "Authorization: Bearer ${activeKey}" \\
   -H "Content-Type: application/json" \\
@@ -93,12 +111,19 @@ export default function DeveloperApi() {
             />
             <button
               type="button"
-              onClick={onGenerate}
-              className="flex shrink-0 items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-hover"
+              onClick={() => void onGenerate()}
+              disabled={busy}
+              className="flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-hover disabled:opacity-50"
             >
               <Plus size={15} /> {t("dev.generate")}
             </button>
           </div>
+          <p className="mt-2 text-[12px] text-neutral-500">{t("dev.billingNote")}</p>
+          {error && (
+            <p role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300">
+              {error}
+            </p>
+          )}
 
           {justCreated && (
             <div className="mt-3 rounded-xl bg-amber-50 p-3 text-sm dark:bg-amber-950/40">
@@ -153,22 +178,16 @@ export default function DeveloperApi() {
                     {k.key_prefix}•••• {!k.is_active && t("dev.revoked")}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setKeyActive(k.id, !k.is_active)}
-                  title={k.is_active ? t("dev.revoke") : t("dev.reactivate")}
-                  className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                >
-                  <Power size={15} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => deleteApiKey(k.id)}
-                  title={t("dev.delete")}
-                  className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-red-500 dark:hover:bg-neutral-800"
-                >
-                  <Trash2 size={15} />
-                </button>
+                {k.is_active && (
+                  <button
+                    type="button"
+                    onClick={() => void onRevoke(k)}
+                    title={t("dev.revoke")}
+                    className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-neutral-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
+                  >
+                    <Ban size={14} /> <span className="hidden sm:inline">{t("dev.revoke")}</span>
+                  </button>
+                )}
               </li>
             ))}
           </ul>

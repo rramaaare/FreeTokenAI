@@ -14,7 +14,6 @@ import {
   Loader2,
   X,
   UserCheck,
-  ShieldCheck,
   Power,
   Wallet,
 } from 'lucide-react';
@@ -31,11 +30,7 @@ type UserItem = {
   created_at: string;
   has_password: boolean;
   is_active: boolean;
-  max_active_keys: number;
-  daily_issue_limit: number;
-  keys_issued_today: number;
   token_balance: number | null;
-  can_issue_api_keys: boolean;
 };
 
 type Cafe = {
@@ -60,14 +55,6 @@ export default function AdminUsersPage() {
   const [editingUser, setEditingUser] = useState<UserItem | null>(null);
   const [deletingUser, setDeletingUser] = useState<UserItem | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [accessUser, setAccessUser] = useState<UserItem | null>(null);
-  const [accessSubmitting, setAccessSubmitting] = useState(false);
-  const [accessForm, setAccessForm] = useState({
-    is_active: true,
-    can_issue_api_keys: false,
-    max_active_keys: 20,
-    daily_issue_limit: 50,
-  });
 
   // Form fields for Add
   const [formData, setFormData] = useState({
@@ -300,57 +287,6 @@ export default function AdminUsersPage() {
     }
   }
 
-  function openAccessModal(u: UserItem) {
-    setAccessUser(u);
-    setAccessForm({
-      is_active: u.is_active,
-      can_issue_api_keys: u.can_issue_api_keys,
-      max_active_keys: u.max_active_keys,
-      daily_issue_limit: u.daily_issue_limit,
-    });
-  }
-
-  async function handleSaveAccess(e: React.FormEvent) {
-    e.preventDefault();
-    if (!accessUser) return;
-    setAccessSubmitting(true);
-    setError('');
-    try {
-      const res = await fetch(`/api/v1/admin/users/${accessUser.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          is_active: accessForm.is_active,
-          max_active_keys: accessForm.max_active_keys,
-          daily_issue_limit: accessForm.daily_issue_limit,
-          permissions: { 'apikey.issue': accessForm.can_issue_api_keys },
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error?.message ?? 'Gagal menyimpan akses');
-      setUsers((prev) =>
-        prev.map((x) =>
-          x.id === accessUser.id
-            ? {
-                ...x,
-                is_active: accessForm.is_active,
-                max_active_keys: accessForm.max_active_keys,
-                daily_issue_limit: accessForm.daily_issue_limit,
-                can_issue_api_keys: accessForm.can_issue_api_keys,
-              }
-            : x,
-        ),
-      );
-      showNotice(`Akses ${accessUser.name || accessUser.email} diperbarui.`);
-      setAccessUser(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Gagal menyimpan akses');
-    } finally {
-      setAccessSubmitting(false);
-    }
-  }
-
   function openWorkspaceBalanceModal(u: UserItem) {
     setWorkspaceBalanceUser(u);
     setWorkspaceBalanceForm({ amount: '', note: '' });
@@ -403,7 +339,7 @@ export default function AdminUsersPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <PageHeader
-        title="Pengguna & Kasir"
+        title="Kafe, Kasir & Pengguna"
         description="Kelola hak akses akun Super Admin, Kasir Restoran/Cafe, dan Customer"
         icon={<Users size={22} className="text-primary" />}
         action={
@@ -481,7 +417,6 @@ export default function AdminUsersPage() {
                   <th className="px-4 py-3 font-semibold">Role</th>
                   <th className="px-4 py-3 font-semibold">Penugasan Cafe</th>
                   <th className="px-4 py-3 font-semibold">Status</th>
-                  <th className="px-4 py-3 font-semibold">Izin API Key</th>
                   <th className="px-4 py-3 font-semibold">Password Akses</th>
                   <th className="px-4 py-3 font-semibold text-right">Aksi</th>
                 </tr>
@@ -544,24 +479,6 @@ export default function AdminUsersPage() {
                       </button>
                     </td>
                     <td className="px-4 py-3.5">
-                      {u.role === 'kasir' ? (
-                        <button
-                          onClick={() => openAccessModal(u)}
-                          title={`Izin API key: ${u.can_issue_api_keys ? 'boleh' : 'tidak'} · maks ${u.max_active_keys} key aktif · ${u.daily_issue_limit} terbit/hari`}
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition ${
-                            u.can_issue_api_keys
-                              ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
-                              : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 border-neutral-200 dark:border-neutral-700'
-                          }`}
-                        >
-                          <ShieldCheck size={11} />
-                          {u.can_issue_api_keys ? 'Boleh' : 'Tidak'}
-                        </button>
-                      ) : (
-                        <span className="text-xs text-neutral-400">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3.5">
                       {u.has_password ? (
                         <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
                           <KeyRound size={12} /> Aktif
@@ -572,15 +489,6 @@ export default function AdminUsersPage() {
                     </td>
                     <td className="px-4 py-3.5 text-right">
                       <div className="inline-flex items-center gap-2">
-                        {u.role === 'kasir' && (
-                          <button
-                            onClick={() => openAccessModal(u)}
-                            title="Atur Akses & Limit"
-                            className="p-1.5 rounded-lg text-neutral-500 hover:text-primary hover:bg-neutral-100 dark:hover:bg-neutral-700 transition"
-                          >
-                            <ShieldCheck size={16} />
-                          </button>
-                        )}
                         {u.role === 'customer' && (
                           <button
                             onClick={() => openWorkspaceBalanceModal(u)}
@@ -980,115 +888,6 @@ export default function AdminUsersPage() {
       )}
 
       {/* MODAL AKSES & LIMIT */}
-      {accessUser && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-neutral-800 rounded-2xl max-w-md w-full border border-neutral-200 dark:border-neutral-700 shadow-xl overflow-hidden">
-            <div className="p-5 border-b border-neutral-200 dark:border-neutral-700 flex items-center justify-between">
-              <h2 className="font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                <ShieldCheck size={18} className="text-primary" />
-                Akses & Limit Kasir
-              </h2>
-              <button
-                onClick={() => setAccessUser(null)}
-                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveAccess} className="p-5 space-y-4 text-sm">
-              <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                Akun: <strong className="text-neutral-900 dark:text-white">{accessUser.name || accessUser.email}</strong>
-              </p>
-
-              <div className="flex items-center justify-between p-3 rounded-lg border border-neutral-200 dark:border-neutral-700">
-                <div>
-                  <div className="text-sm font-medium text-neutral-900 dark:text-white">Status Akun</div>
-                  <div className="text-xs text-neutral-500 dark:text-neutral-400">Nonaktif = tidak bisa login.</div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setAccessForm((f) => ({ ...f, is_active: !f.is_active }))}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
-                    accessForm.is_active ? 'bg-emerald-500' : 'bg-neutral-300 dark:bg-neutral-600'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
-                      accessForm.is_active ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between p-3 rounded-lg border border-neutral-200 dark:border-neutral-700">
-                <div>
-                  <div className="text-sm font-medium text-neutral-900 dark:text-white">Boleh Generate API Key</div>
-                  <div className="text-xs text-neutral-500 dark:text-neutral-400">Override izin khusus akun ini.</div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setAccessForm((f) => ({ ...f, can_issue_api_keys: !f.can_issue_api_keys }))}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
-                    accessForm.can_issue_api_keys ? 'bg-blue-500' : 'bg-neutral-300 dark:bg-neutral-600'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
-                      accessForm.can_issue_api_keys ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
-                    Maks Key Aktif
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={accessForm.max_active_keys}
-                    onChange={(e) => setAccessForm((f) => ({ ...f, max_active_keys: Number(e.target.value) }))}
-                    className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-900 px-3 py-2 text-neutral-900 dark:text-white outline-none focus:border-primary"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
-                    Maks Key / Hari
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={accessForm.daily_issue_limit}
-                    onChange={(e) => setAccessForm((f) => ({ ...f, daily_issue_limit: Number(e.target.value) }))}
-                    className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-900 px-3 py-2 text-neutral-900 dark:text-white outline-none focus:border-primary"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-3 flex items-center justify-end gap-2 border-t border-neutral-200 dark:border-neutral-700">
-                <button
-                  type="button"
-                  onClick={() => setAccessUser(null)}
-                  className="px-4 py-2 rounded-lg text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={accessSubmitting}
-                  className="px-4 py-2 rounded-lg bg-primary text-white font-medium hover:bg-primary/90 transition flex items-center gap-2"
-                >
-                  {accessSubmitting && <Loader2 size={16} className="animate-spin" />}
-                  Simpan Akses
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* MODAL SALDO TOKEN CUSTOMER */}
       {workspaceBalanceUser && (

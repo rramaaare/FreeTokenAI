@@ -1,17 +1,18 @@
 // ponytail: satu helper server-only untuk Vio. Key TIDAK PERNAH ke client.
 // BYOK: key diambil dari registry (DB terenkripsi) dengan fallback env VIO_API_KEY.
 import { fetchRetryOnce } from "./obs";
-import { providerKey } from "./model-registry";
+import { PROVIDER_USER_AGENT, providerKey } from "./model-registry";
 
 export const VIO_BASE = "https://api.viostudio.id/v1";
 
 export async function vioHeaders() {
   const key = await providerKey("vio");
   if (!key)
-    throw new Error("API key Vio belum diisi (menu Model & API Key di /admin, atau VIO_API_KEY di .env.local)");
+    throw new Error("API key Vio belum diisi (menu Provider & Model AI di /admin, atau VIO_API_KEY di .env.local)");
   return {
     Authorization: `Bearer ${key}`,
     "Content-Type": "application/json",
+    "User-Agent": PROVIDER_USER_AGENT,
   };
 }
 
@@ -33,12 +34,12 @@ export async function vioFetch(path: string, init?: RequestInit) {
  */
 export async function vioUploadAsset(file: File | Blob, filename = "reference.png"): Promise<number> {
   const key = await providerKey("vio");
-  if (!key) throw new Error("API key Vio belum diisi (menu Model & API Key di /admin).");
+  if (!key) throw new Error("API key Vio belum diisi (menu Provider & Model AI di /admin).");
   const form = new FormData();
   form.append("file", file, filename);
   const res = await fetch(`${VIO_BASE}/assets`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${key}` }, // biarkan runtime set boundary multipart
+    headers: { Authorization: `Bearer ${key}`, "User-Agent": PROVIDER_USER_AGENT }, // biarkan runtime set boundary multipart
     body: form,
     cache: "no-store",
   });

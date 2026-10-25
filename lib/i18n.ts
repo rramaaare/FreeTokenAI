@@ -46,6 +46,8 @@ const id = {
 
   // token habis
   "tokens.title": "Saldo Token Habis",
+  "tokens.expiredTitle": "Masa Aktif Habis",
+  "tokens.expiredDesc": "Sisa Token masih tersimpan. Klaim struk baru untuk mengaktifkan lagi (+7 hari).",
   "tokens.desc": "Pilih salah satu cara di bawah untuk lanjut memakai AI.",
   "tokens.balance": "Sisa Token",
   "tokens.claimTitle": "Punya kode struk?",
@@ -118,7 +120,7 @@ const id = {
   "settings.about.title": "Tentang",
   "settings.about.desc": "Versi & aturan main Token.",
   "settings.about.text":
-    "FreeTokenAI v1.5 — Workspace berlaku 7 hari, dan Token otomatis diperpanjang 7 hari setiap transaksi berbayar selama saldo masih ada. Butuh bantuan? Hubungi kasir restoran.",
+    "FreeTokenAI v1.5 — Setiap klaim struk menambah masa aktif 7 hari (maks 30 hari ke depan). Lewat masa aktif, AI berhenti sampai Anda klaim struk baru; sisa Token tetap tersimpan. Butuh bantuan? Hubungi kasir.",
 
   // chat
   "chat.activeUntil": "Aktif Sampai {date}",
@@ -274,11 +276,11 @@ const id = {
   // developer api
   "dev.title": "Developer API",
   "dev.subtitle":
-    "Generate API Key (PRD 7.4) lalu pakai di AI agent via gateway OpenAI-compatible (PRD 7.3).",
+    "Buat API key untuk aplikasi/AI agent Anda. Format OpenAI-compatible; setiap pemakaian memotong saldo Token akun ini.",
   "dev.keyTitle": "API Key untuk AI Agent",
   "dev.namePlaceholder": "Nama key, mis. Agen Warung — maks 100 char",
   "dev.generate": "Generate",
-  "dev.copyNow": "Salin sekarang — key hanya ditampilkan 1x (NFR #2).",
+  "dev.copyNow": "Salin sekarang — key lengkap hanya ditampilkan sekali dan tidak bisa dilihat lagi.",
   "dev.reveal": "Tampilkan key",
   "dev.copied": "Tersalin",
   "dev.copy": "Salin",
@@ -286,8 +288,8 @@ const id = {
   "dev.noKeys": "Belum ada key. Generate satu di atas.",
   "dev.revoked": "(dicabut)",
   "dev.revoke": "Cabut key",
-  "dev.reactivate": "Aktifkan lagi",
-  "dev.delete": "Hapus permanen",
+  "dev.revokeConfirm": "Cabut key \"{name}\"? Aplikasi yang memakainya langsung berhenti dan key tidak bisa diaktifkan lagi.",
+  "dev.billingNote": "Key tersimpan di server dan terikat ke akun ini. Pemakaian lewat key memotong saldo Token & mengikuti masa aktif akun Anda.",
   "dev.usageTitle": "Pakai di AI Agent",
   "dev.usagePre":
     "Bentuk OpenAI-compatible — LangChain / Vercel AI SDK / curl langsung jalan. Base URL = asal dashboard ini + ",
@@ -325,7 +327,7 @@ const id = {
   "claim.submit": "Klaim token",
   "claim.processing": "Memproses…",
   "claim.note":
-    "Satu kode struk hanya bisa diklaim satu kali. Token berlaku 7 hari sejak klaim.",
+    "Satu kode struk hanya bisa diklaim satu kali. Setiap klaim menambah masa aktif 7 hari (maks 30 hari).",
   "claim.signedInNote": "Token akan langsung masuk ke akun yang sedang login.",
   "claim.signedInSuccess": "Token masuk ke akunmu. Kamu tidak perlu login ulang.",
   "claim.httpFailed": "Klaim gagal (HTTP {status}).",
@@ -365,6 +367,8 @@ const en: Record<keyof typeof id, string> = {
     "Have a receipt? Enter its code and your WhatsApp/email on the claim page.",
 
   "tokens.title": "Token Balance Empty",
+  "tokens.expiredTitle": "Workspace Expired",
+  "tokens.expiredDesc": "Your remaining Tokens are kept. Claim a new receipt to reactivate (+7 days).",
   "tokens.desc": "Choose one of the options below to keep using AI.",
   "tokens.balance": "Remaining Tokens",
   "tokens.claimTitle": "Have a receipt code?",
@@ -436,7 +440,7 @@ const en: Record<keyof typeof id, string> = {
   "settings.about.title": "About",
   "settings.about.desc": "Version & token rules.",
   "settings.about.text":
-    "FreeTokenAI v1.5 — Workspaces last 7 days, and Tokens auto-extend by 7 days on every paid transaction while your balance is positive. Need help? Contact the restaurant cashier.",
+    "FreeTokenAI v1.5 — Each receipt claim adds 7 days of activity (max 30 days ahead). Once expired, AI stops until you claim a new receipt; remaining Tokens are kept. Need help? Contact the cashier.",
 
   "chat.activeUntil": "Active until {date}",
   "chat.headline": "Where would you like to start today?",
@@ -584,11 +588,11 @@ const en: Record<keyof typeof id, string> = {
 
   "dev.title": "Developer API",
   "dev.subtitle":
-    "Generate an API Key (PRD 7.4) and use it in AI agents via the OpenAI-compatible gateway (PRD 7.3).",
+    "Create an API key for your app/AI agent. OpenAI-compatible; every call deducts Tokens from this account.",
   "dev.keyTitle": "API Key for AI Agents",
   "dev.namePlaceholder": "Key name, e.g. Warung Agent — max 100 chars",
   "dev.generate": "Generate",
-  "dev.copyNow": "Copy now — the key is shown only once (NFR #2).",
+  "dev.copyNow": "Copy it now — the full key is shown only once and can't be viewed again.",
   "dev.reveal": "Show key",
   "dev.copied": "Copied",
   "dev.copy": "Copy",
@@ -596,8 +600,8 @@ const en: Record<keyof typeof id, string> = {
   "dev.noKeys": "No keys yet. Generate one above.",
   "dev.revoked": "(revoked)",
   "dev.revoke": "Revoke key",
-  "dev.reactivate": "Reactivate",
-  "dev.delete": "Delete permanently",
+  "dev.revokeConfirm": "Revoke key \"{name}\"? Apps using it stop immediately and it can't be reactivated.",
+  "dev.billingNote": "Keys are stored on the server and tied to this account. Calls deduct this account's Tokens and follow its active period.",
   "dev.usageTitle": "Use in an AI Agent",
   "dev.usagePre":
     "OpenAI-compatible — LangChain / Vercel AI SDK / curl works out of the box. Base URL = this dashboard origin + ",
@@ -634,7 +638,7 @@ const en: Record<keyof typeof id, string> = {
   "claim.submit": "Claim tokens",
   "claim.processing": "Processing…",
   "claim.note":
-    "Each receipt code can only be claimed once. Tokens are valid for 7 days from claiming.",
+    "Each receipt code can only be claimed once. Each claim adds 7 days of activity (max 30 days).",
   "claim.signedInNote": "Tokens will go directly to the account you are signed in with.",
   "claim.signedInSuccess": "Tokens were added to your account. No need to sign in again.",
   "claim.httpFailed": "Claim failed (HTTP {status}).",

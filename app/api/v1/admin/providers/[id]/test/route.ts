@@ -19,7 +19,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // tanpa body -> uji key tersimpan
   }
 
-  const { providerKey, testProviderKey } = await import("@/lib/model-registry");
+  const { cleanApiKey, providerKey, testProviderKey } = await import("@/lib/model-registry");
   const { sql } = await import("@/lib/db");
   const rows = (await sql`
     SELECT slug, base_url FROM providers WHERE id = ${id} LIMIT 1`) as unknown as {
@@ -30,7 +30,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: { code: "NOT_FOUND", message: "Provider tidak ditemukan." } }, { status: 404 });
 
   const key = typeof body.api_key === "string" && body.api_key.trim()
-    ? body.api_key.trim()
+    ? cleanApiKey(body.api_key)
     : await providerKey(rows[0].slug);
   if (!key)
     return NextResponse.json(

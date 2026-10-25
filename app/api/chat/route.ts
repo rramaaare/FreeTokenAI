@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { permissionDenied } from "@/lib/permissions";
 import { resolveRoute, chatComplete, type AiRoute } from "@/lib/ai-router";
 import { DEFAULT_CHAT_MODEL } from "@/lib/chat-models";
 import { isModelAllowed, modelCost } from "@/lib/model-registry";
@@ -106,6 +107,8 @@ async function persistAndRespond(
 }
 
 export async function POST(req: Request) {
+  const denied = await permissionDenied("customer", "ai.chat");
+  if (denied) return denied;
   let body: { message?: unknown; history?: HistItem[]; model?: unknown; session_id?: unknown; lang?: unknown };
   try {
     body = await req.json();
@@ -178,7 +181,7 @@ export async function POST(req: Request) {
     if (res.ok) return persistAndRespond(res, { wsId, sessionId, message, usageId });
     return res;
   } catch (e) {
-    if (e instanceof InsufficientTokensError) return insufficient(e.balance, "chat");
+    if (e instanceof InsufficientTokensError) return insufficient(e, "chat");
     throw e;
   }
 }

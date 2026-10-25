@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
+import { sweepExpiredReceipts } from '@/lib/receipts';
 import { requireAdmin } from '@/lib/auth';
 import { logAudit } from '@/lib/permissions';
 
@@ -13,6 +14,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const { id } = await params;
 
   try {
+    // token struk kedaluwarsa kembali ke saldo cafe sebelum saldo ditampilkan.
+    await sweepExpiredReceipts(id);
     const cafe = (await sql`
       SELECT
         c.id,

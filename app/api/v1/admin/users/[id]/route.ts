@@ -1,14 +1,7 @@
 import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { requireAdmin, hashPassword } from '@/lib/auth';
-import { isPermissionKey, logAudit } from '@/lib/permissions';
-
-function normalizePermissions(input: unknown): Array<{ key: string; allowed: boolean }> {
-  if (!input || typeof input !== 'object') return [];
-  return Object.entries(input as Record<string, unknown>)
-    .filter(([key, value]) => isPermissionKey(key) && typeof value === 'boolean')
-    .map(([key, allowed]) => ({ key, allowed: allowed as boolean }));
-}
+import { logAudit } from '@/lib/permissions';
 
 export async function PATCH(
   req: Request,
@@ -30,9 +23,6 @@ export async function PATCH(
     cafe_id?: unknown;
     password?: unknown;
     is_active?: unknown;
-    max_active_keys?: unknown;
-    daily_issue_limit?: unknown;
-    permissions?: unknown;
   };
 
   try {
@@ -56,9 +46,6 @@ export async function PATCH(
   const cafeId = body.cafe_id === null ? null : typeof body.cafe_id === 'string' && body.cafe_id.trim() ? body.cafe_id.trim() : undefined;
   const password = typeof body.password === 'string' && body.password.length > 0 ? body.password : undefined;
   const isActive = typeof body.is_active === 'boolean' ? body.is_active : undefined;
-  const maxActiveKeys = typeof body.max_active_keys === 'number' && body.max_active_keys >= 0 ? body.max_active_keys : undefined;
-  const dailyIssueLimit = typeof body.daily_issue_limit === 'number' && body.daily_issue_limit >= 0 ? body.daily_issue_limit : undefined;
-  const permissions = normalizePermissions(body.permissions);
 
   let passwordHash: string | undefined = undefined;
   if (password !== undefined) {
@@ -95,11 +82,9 @@ export async function PATCH(
         role = COALESCE(${role ?? null}, role),
         cafe_id = ${cafeId !== undefined ? cafeId : sql`cafe_id`},
         is_active = COALESCE(${isActive ?? null}, is_active),
-        max_active_keys = COALESCE(${maxActiveKeys ?? null}, max_active_keys),
-        daily_issue_limit = COALESCE(${dailyIssueLimit ?? null}, daily_issue_limit),
         admin_password_hash = COALESCE(${passwordHash ?? null}, admin_password_hash)
       WHERE id = ${id}
-      RETURNING id, name, email, phone_number, role, cafe_id, created_at, is_active, max_active_keys, daily_issue_limit, (admin_password_hash IS NOT NULL) AS has_password
+      RETURNING id, name, email, phone_number, role, cafe_id, created_at, is_active, (admin_password_hash IS NOT NULL) AS has_password
     `) as unknown as Array<{
       id: string;
       name: string | null;
@@ -109,24 +94,8 @@ export async function PATCH(
       cafe_id: string | null;
       created_at: string;
       is_active: boolean;
-      max_active_keys: number;
-      daily_issue_limit: number;
       has_password: boolean;
     }>;
-
-    // Update permissions override if provided
-    if (permissions.length > 0) {
-      await sql.begin(async (tx: any) => {
-        for (const p of permissions) {
-          await tx`
-            INSERT INTO user_permissions (user_id, permission_key, allowed, updated_at)
-            VALUES (${id}, ${p.key}, ${p.allowed}, now())
-            ON CONFLICT (user_id, permission_key)
-            DO UPDATE SET allowed = EXCLUDED.allowed, updated_at = now()`;
-        }
-      });
-      await logAudit(auth.user.id, 'user.permissions_update', 'user_permissions', id, { permissions });
-    }
 
     await logAudit(auth.user.id, 'user.update', 'users', id, { role, is_active: isActive });
 
@@ -169,6 +138,7 @@ export async function DELETE(
       // Lepas relasi receipts yang dibuat oleh user ini sebelum dihapus
       await tx`UPDATE receipts SET created_by_user_id = NULL WHERE created_by_user_id = ${id}`;
       await tx`UPDATE cafe_token_transactions SET created_by_user_id = NULL WHERE created_by_user_id = ${id}`;
+      // baris override izin lama (tabel warisan matriks RBAC) ikut dibersihkan.
       await tx`DELETE FROM user_permissions WHERE user_id = ${id}`;
       await tx`DELETE FROM users WHERE id = ${id}`;
     });

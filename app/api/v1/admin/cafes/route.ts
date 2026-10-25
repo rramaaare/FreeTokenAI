@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { randomBytes } from 'node:crypto';
 import { sql } from '@/lib/db';
+import { sweepExpiredReceipts } from '@/lib/receipts';
 import { requireAdmin } from '@/lib/auth';
 import { logAudit } from '@/lib/permissions';
 
@@ -24,18 +25,21 @@ export async function GET(req: Request) {
   }
 
   try {
+    // token struk kedaluwarsa kembali ke saldo cafe sebelum saldo ditampilkan.
+    await sweepExpiredReceipts(null);
     const cafes = (await sql`
       SELECT
         c.id,
         c.name,
         c.is_active,
         c.prepaid_token_balance::int AS token_balance,
-        COALESCE((SELECT SUM(amount) FROM cafe_token_transactions WHERE cafe_id = c.id AND amount > 0), 0)::int AS total_topup,
-        COALESCE((SELECT SUM(-amount) FROM cafe_token_transactions WHERE cafe_id = c.id AND amount < 0), 0)::int AS total_used,
+        COALESCE((SELECT SUM(amount) FROM cafe_token_transactions WHERE cafe_id = c.id AND type = 'topup'), 0)::int AS total_topup,
+        COALESCE((SELECT SUM(-amount) FROM cafe_token_transactions WHERE cafe_id = c.id AND type = 'reserve'), 0)::int AS total_used,
         (SELECT MAX(created_at) FROM cafe_token_transactions WHERE cafe_id = c.id) AS last_activity_at,
         (SELECT MAX(expires_at) FROM workspaces WHERE cafe_id = c.id) AS expires_at,
         (SELECT COUNT(*)::int FROM workspaces WHERE cafe_id = c.id AND expires_at > now()) AS active_workspaces,
-        (SELECT COUNT(*)::int FROM api_keys WHERE cafe_id = c.id AND is_active AND revoked_at IS NULL) AS active_keys
+        (SELECT COUNT(*)::int FROM api_keys k JOIN workspaces w ON w.id = k.workspace_id
+          WHERE w.cafe_id = c.id AND k.is_active AND k.revoked_at IS NULL) AS active_keys
       FROM cafes c
       ORDER BY c.created_at DESC`) as unknown as {
       id: string; name: string; is_active: boolean; token_balance: number; total_topup: number;

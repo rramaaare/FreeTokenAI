@@ -102,6 +102,7 @@ export default function AdminPage() {
         name="Super Admin"
         description="Pantau saldo prepaid, konsumsi token, dan aktivitas workspace seluruh cafe dari satu tempat."
       />
+
       <PageHeader
         title="Daftar Cafe"
         description="Pantau saldo prepaid, konsumsi token, dan workspace tiap cafe."
@@ -124,8 +125,8 @@ export default function AdminPage() {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Total Saldo" value={n(totals.balance)} hint="token tersedia" icon={<Wallet size={16} />} />
-        <StatCard label="Total Top-Up" value={n(totals.topup)} hint="akumulasi masuk" icon={<TrendingUp size={16} />} tone="success" />
-        <StatCard label="Total Terpakai" value={n(totals.used)} hint="akumulasi keluar" icon={<TrendingDown size={16} />} tone="warning" />
+        <StatCard label="Total Diterbitkan" value={n(totals.topup)} hint="top-up admin ke kafe" icon={<TrendingUp size={16} />} tone="success" />
+        <StatCard label="Dibagikan ke Struk" value={n(totals.used)} hint="token yang kafe terbitkan jadi struk" icon={<TrendingDown size={16} />} tone="warning" />
         <StatCard label="Saldo Rendah" value={n(totals.low)} hint="< 5.000 token" icon={<Activity size={16} />} tone={totals.low > 0 ? 'danger' : 'neutral'} />
       </div>
 

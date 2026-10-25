@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createHash, randomBytes } from "node:crypto";
 import { requireAuth } from "@/lib/auth";
 import { sql } from "@/lib/db";
+import { permissionDenied } from "@/lib/permissions";
 
 // ponytail: PRD §7.4/§5.3 + NFR#2 — key asli `rst_live_<128-bit>` hanya
 // dikembalikan SEKALI di respons POST; DB simpan SHA-256 (validateApiKey di
@@ -55,6 +56,8 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const { wsId, error } = await authedWorkspace(req);
   if (error) return error;
+  const denied = await permissionDenied("customer", "ai.developer");
+  if (denied) return denied;
   let body: { name?: unknown };
   try {
     body = await req.json();

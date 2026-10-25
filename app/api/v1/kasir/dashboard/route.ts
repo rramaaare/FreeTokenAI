@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { corsHeaders, requireAdmin, requireAllowedOrigin } from "@/lib/auth";
 import { sql } from "@/lib/db";
+import { permissionDenied } from "@/lib/permissions";
+import { RECEIPT_VALID_DAYS, sweepExpiredReceipts } from "@/lib/receipts";
 
 // ponytail: dashboard kasir = 1 endpoint scoped ke cafe milik kasir (JWT
 // cafe_id). Fokus ke penjualan struk (bonus produk vs token ketengan), struk
@@ -39,6 +41,8 @@ export async function GET(req: Request) {
       { error: { code: auth.toUpperCase(), message: "Akses kasir tidak sah." } },
       { status: auth === "unauthorized" ? 401 : 403, headers: corsHeaders(origin) },
     );
+  const denied = await permissionDenied(auth.user.role, "kasir.dashboard", corsHeaders(origin));
+  if (denied) return denied;
 
   const cafeId = new URL(req.url).searchParams.get("cafe_id") ?? auth.user.cafe_id;
   if (!cafeId)
@@ -53,6 +57,8 @@ export async function GET(req: Request) {
     );
 
   try {
+    // token struk kedaluwarsa kembali ke saldo cafe sebelum angka saldo dibaca.
+    await sweepExpiredReceipts(cafeId);
     const cafes = (await sql`
       SELECT id, name, prepaid_token_balance::int AS token_balance, is_active
       FROM cafes WHERE id = ${cafeId} LIMIT 1`) as unknown as {
@@ -64,7 +70,7 @@ export async function GET(req: Request) {
         { status: 404, headers: corsHeaders(origin) },
       );
 
-    const [today, week, byDay, unclaimed, recent, usage, byEndpoint, transactions] = (await Promise.all([
+    const [today, week, byDay, unclaimed, expiredWeek, recent, usage, byEndpoint, transactions] = (await Promise.all([
       salesSince(cafeId, sql`current_date`),
       salesSince(cafeId, sql`current_date - interval '6 days'`),
       sql`
@@ -77,10 +83,15 @@ export async function GET(req: Request) {
         GROUP BY 1 ORDER BY 1`,
       sql`
         SELECT COUNT(*)::int AS receipts, COALESCE(SUM(tokens_granted), 0)::int AS tokens,
-          MIN(created_at) AS oldest
-        FROM receipts WHERE cafe_id = ${cafeId} AND COALESCE(is_claimed, FALSE) = FALSE`,
+          MIN(created_at) AS oldest, MIN(expires_at) AS next_expiry
+        FROM receipts WHERE cafe_id = ${cafeId} AND is_claimed IS NOT TRUE
+          AND refunded_at IS NULL AND (expires_at IS NULL OR expires_at > now())`,
       sql`
-        SELECT code, tokens_granted AS tokens, purchase_type, rupiah_amount, COALESCE(is_claimed, FALSE) AS claimed, created_at
+        SELECT COUNT(*)::int AS receipts, COALESCE(SUM(tokens_granted), 0)::int AS tokens
+        FROM receipts WHERE cafe_id = ${cafeId} AND refunded_at >= current_date - interval '6 days'`,
+      sql`
+        SELECT code, tokens_granted AS tokens, purchase_type, rupiah_amount, COALESCE(is_claimed, FALSE) AS claimed,
+          (is_claimed IS NOT TRUE AND (refunded_at IS NOT NULL OR expires_at <= now())) AS expired, created_at
         FROM receipts WHERE cafe_id = ${cafeId}
         ORDER BY created_at DESC LIMIT 8`,
       sql`
@@ -106,8 +117,9 @@ export async function GET(req: Request) {
       SalesRow[],
       SalesRow[],
       { day: string; product: number; retail: number; retail_rupiah: string | number }[],
-      { receipts: number; tokens: number; oldest: string | null }[],
-      { code: string; tokens: number; purchase_type: string | null; rupiah_amount: number | null; claimed: boolean; created_at: string }[],
+      { receipts: number; tokens: number; oldest: string | null; next_expiry: string | null }[],
+      { receipts: number; tokens: number }[],
+      { code: string; tokens: number; purchase_type: string | null; rupiah_amount: number | null; claimed: boolean; expired: boolean; created_at: string }[],
       { today_tokens: number; week_tokens: number; today_customers: number; week_customers: number }[],
       { endpoint_type: string; requests: number; tokens: number }[],
       { type: string; amount: number; balance_after: number; note: string | null; created_at: string }[],
@@ -132,7 +144,9 @@ export async function GET(req: Request) {
         sales: { today: normalize(today[0]), week: normalize(week[0]) },
         by_day: days,
         balance_forecast: { avg_daily_tokens: Math.round(avgDaily), days_left: daysLeft },
-        unclaimed: unclaimed[0] ?? { receipts: 0, tokens: 0, oldest: null },
+        unclaimed: unclaimed[0] ?? { receipts: 0, tokens: 0, oldest: null, next_expiry: null },
+        expired_week: expiredWeek[0] ?? { receipts: 0, tokens: 0 },
+        receipt_valid_days: RECEIPT_VALID_DAYS,
         recent_receipts: recent,
         usage: usage[0] ?? { today_tokens: 0, week_tokens: 0, today_customers: 0, week_customers: 0 },
         by_endpoint: byEndpoint,

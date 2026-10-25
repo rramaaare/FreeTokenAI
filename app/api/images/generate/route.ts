@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { permissionDenied } from "@/lib/permissions";
 import { generateImages, recordVioJobs } from "@/lib/ai-media";
 import { requireAuth } from "@/lib/auth";
 import { resolveRoute } from "@/lib/ai-router";
@@ -19,6 +20,8 @@ export const maxDuration = 60;
 const IMAGE_MODELS = ["nano-banana-2", "nano-banana-pro", "qwen-image"];
 
 export async function POST(req: Request) {
+  const denied = await permissionDenied("customer", "ai.image");
+  if (denied) return denied;
   try {
     const { prompt, model, aspect_ratio, count } = await req.json();
     if (!prompt || String(prompt).trim().length === 0)
@@ -73,7 +76,7 @@ export async function POST(req: Request) {
         units: finalCount,
       });
     } catch (e) {
-      if (e instanceof InsufficientTokensError) return insufficient(e.balance, "image");
+      if (e instanceof InsufficientTokensError) return insufficient(e, "image");
       throw e;
     }
   } catch (e) {

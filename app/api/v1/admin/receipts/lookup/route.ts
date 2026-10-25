@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { claimUrl } from "@/lib/app-url";
 import { requireAdmin } from "@/lib/auth";
 import { sql } from "@/lib/db";
+import { permissionDenied } from "@/lib/permissions";
+import { receiptStatus, sweepExpiredReceipts } from "@/lib/receipts";
 
 // ponytail: cek status struk untuk kasir — kode struk -> sudah diklaim / belum,
 // siapa pengklaimnya (disamarkan), dan sisa saldo workspace pelanggan itu.
@@ -22,15 +24,19 @@ export async function GET(req: Request) {
     const status = auth === "unauthorized" ? 401 : 403;
     return NextResponse.json({ error: { code: "FORBIDDEN", message: "Akses tidak sah." } }, { status });
   }
+  const denied = await permissionDenied(auth.user.role, "receipt.view");
+  if (denied) return denied;
 
   const code = (new URL(req.url).searchParams.get("code") ?? "").trim().toUpperCase().slice(0, 20);
   if (!code) {
     return NextResponse.json({ error: { code: "CODE_REQUIRED", message: "Kode struk wajib." } }, { status: 400 });
   }
 
+  await sweepExpiredReceipts(auth.user.role === "kasir" ? auth.user.cafe_id : null);
   const rows = (await sql`
     SELECT r.code, r.tokens_granted, r.is_claimed, r.claimed_at, r.created_at, r.cafe_id,
            r.purchase_type, r.rupiah_amount, r.pos_reference_id,
+           r.expires_at AS receipt_expires_at, r.refunded_at,
            c.name AS cafe_name, u.email, u.phone_number, u.name AS user_name,
            w.token_balance, w.expires_at
     FROM receipts r
@@ -47,6 +53,8 @@ export async function GET(req: Request) {
     purchase_type: string | null;
     rupiah_amount: number | null;
     pos_reference_id: string | null;
+    receipt_expires_at: string | null;
+    refunded_at: string | null;
     cafe_name: string | null;
     email: string | null;
     phone_number: string | null;
@@ -70,6 +78,9 @@ export async function GET(req: Request) {
       cafe_name: r.cafe_name,
       claimed: Boolean(r.is_claimed),
       claimed_at: r.claimed_at,
+      status: receiptStatus({ is_claimed: r.is_claimed, refunded_at: r.refunded_at, expires_at: r.receipt_expires_at }),
+      expires_at: r.receipt_expires_at,
+      refunded_at: r.refunded_at,
       claim_url: claimUrl(req, r.code),
       purchase_type: r.purchase_type,
       rupiah_amount: r.rupiah_amount,

@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { createSession, requireAuth, sessionCookieHeader } from "@/lib/auth";
+import { extendedExpiry } from "@/lib/billing";
 import { sql } from "@/lib/db";
 import { rateLimited, retryAfterSec } from "@/lib/rate-limit";
+import { RECEIPT_VALID_DAYS } from "@/lib/receipts";
 
 // ponytail: PRD §4.2/§7.2 — klaim QR struk publik (tanpa auth). Alur:
 //   1) kunci receipt (FOR UPDATE) -> tolak kalau sudah diklaim (409)
@@ -99,16 +101,26 @@ export async function POST(req: Request) {
   try {
     const out = (await sql.begin(async (tx: any) => {
       const rc = (await tx`
-        SELECT id, tokens_granted, is_claimed, cafe_id FROM receipts
+        SELECT id, tokens_granted, is_claimed, cafe_id,
+               (refunded_at IS NOT NULL OR (expires_at IS NOT NULL AND expires_at <= now())) AS expired
+        FROM receipts
         WHERE code = ${code} LIMIT 1 FOR UPDATE`) as unknown as {
         id: string;
         tokens_granted: number;
         is_claimed: boolean;
         cafe_id: string | null;
+        expired: boolean;
       }[];
       if (!rc[0]) throw new ClaimError("RECEIPT_NOT_FOUND", 404, "Kode struk tidak ditemukan.");
       if (rc[0].is_claimed)
         throw new ClaimError("RECEIPT_ALREADY_CLAIMED", 409, "Kode struk sudah pernah diklaim.");
+      // struk hangus: tokennya kembali ke saldo cafe (lib/receipts.ts), bukan ke pelanggan.
+      if (rc[0].expired)
+        throw new ClaimError(
+          "RECEIPT_EXPIRED",
+          410,
+          `Kode struk sudah kedaluwarsa (tidak diklaim dalam ${RECEIPT_VALID_DAYS} hari). Minta struk baru di kasir.`,
+        );
 
       let uid: string;
       if (auth) {
@@ -152,11 +164,12 @@ export async function POST(req: Request) {
       }
       const wsId = ws[0].id;
 
-      // grant + extend 7 hari dari sekarang (PRD §2 Workspace Cycle)
+      // grant + masa aktif: sisa + 7 hari (lewat -> 7 hari dari sekarang), maks 30 hari
+      // ke depan — aturan di lib/billing.ts (extendedExpiry).
       const upd = (await tx`
         UPDATE workspaces
         SET token_balance = token_balance + ${rc[0].tokens_granted},
-            expires_at = now() + interval '7 days'
+            expires_at = ${extendedExpiry()}
         WHERE id = ${wsId}
         RETURNING id, token_balance, expires_at`) as unknown as {
         id: string;

@@ -17,10 +17,12 @@ type Dashboard = {
   sales: { today: Sales; week: Sales };
   by_day: { day: string; product: number; retail: number; retail_rupiah: number }[];
   balance_forecast: { avg_daily_tokens: number; days_left: number | null };
-  unclaimed: { receipts: number; tokens: number; oldest: string | null };
+  unclaimed: { receipts: number; tokens: number; oldest: string | null; next_expiry: string | null };
+  expired_week: { receipts: number; tokens: number };
+  receipt_valid_days: number;
   recent_receipts: {
     code: string; tokens: number; purchase_type: string | null; rupiah_amount: number | null;
-    claimed: boolean; created_at: string;
+    claimed: boolean; expired: boolean; created_at: string;
   }[];
   usage: { today_tokens: number; week_tokens: number; today_customers: number; week_customers: number };
   by_endpoint: { endpoint_type: string; requests: number; tokens: number }[];
@@ -35,7 +37,7 @@ const dayLabel = (day: string) => new Date(`${day}T00:00:00`).toLocaleDateString
 const dayLong = (day: string) =>
   new Date(`${day}T00:00:00`).toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "short" });
 
-const TX_LABEL: Record<string, string> = { topup: "Top-up", reserve: "Terbit struk", refund: "Refund", adjustment: "Koreksi" };
+const TX_LABEL: Record<string, string> = { topup: "Top-up", reserve: "Terbit struk", refund: "Struk hangus (dikembalikan)", adjustment: "Koreksi" };
 const ENDPOINT_LABEL: Record<string, string> = { chat: "Chat", image: "Gambar", video: "Video" };
 
 // Palet 2 seri divalidasi (dataviz validate_palette): oranye = produk, biru = ketengan.
@@ -128,8 +130,10 @@ export default function KasirDashboard({ authFetch }: { authFetch: (path: string
           <p className="mt-2 text-2xl font-bold tabular-nums text-neutral-900 dark:text-neutral-50">{n(data.unclaimed.receipts)}</p>
           <p className="mt-1 text-[11px] text-neutral-400">
             {data.unclaimed.receipts > 0
-              ? `${n(data.unclaimed.tokens)} token tertahan · terlama ${when(data.unclaimed.oldest!)}`
-              : "Semua struk sudah diklaim pelanggan"}
+              ? `${n(data.unclaimed.tokens)} token tertahan · hangus terdekat ${when(data.unclaimed.next_expiry ?? data.unclaimed.oldest!)}`
+              : "Tidak ada struk yang menunggu klaim"}
+            <br />
+            Tidak diklaim {data.receipt_valid_days} hari = token kembali ke saldo cafe.
           </p>
         </Link>
         <div
@@ -187,6 +191,15 @@ export default function KasirDashboard({ authFetch }: { authFetch: (path: string
                 {n(week.claimed)} dari {n(week.receipts)} struk 7 hari sudah dipakai pelanggan
               </p>
             </div>
+            <div className="rounded-lg bg-neutral-50 p-3 dark:bg-neutral-800/60">
+              <div className="flex items-center justify-between">
+                <dt className="text-neutral-500 dark:text-neutral-400">Struk hangus</dt>
+                <dd className="font-semibold tabular-nums text-neutral-900 dark:text-neutral-50">{n(data.expired_week.receipts)}</dd>
+              </div>
+              <p className="mt-0.5 text-[11px] text-neutral-400">
+                {n(data.expired_week.tokens)} token kembali ke saldo cafe (7 hari terakhir)
+              </p>
+            </div>
           </dl>
         </div>
       </div>
@@ -219,10 +232,12 @@ export default function KasirDashboard({ authFetch }: { authFetch: (path: string
                       className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                         r.claimed
                           ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
-                          : "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
+                          : r.expired
+                            ? "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
+                            : "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
                       }`}
                     >
-                      {r.claimed ? "✓ Diklaim" : "Belum diklaim"}
+                      {r.claimed ? "✓ Diklaim" : r.expired ? "Hangus" : "Belum diklaim"}
                     </span>
                     <span className="ml-auto text-right text-xs tabular-nums text-neutral-700 dark:text-neutral-200">
                       {n(r.tokens)} token

@@ -249,7 +249,7 @@ function useStreamingChat() {
           const data = (await res.json().catch(() => ({}))) as {
             error?: { code?: string; message?: string };
           };
-          if (data?.error?.code === "INSUFFICIENT_TOKENS") notifyTokensExhausted();
+          if (data?.error?.code === "INSUFFICIENT_TOKENS" || data?.error?.code === "WORKSPACE_EXPIRED") notifyTokensExhausted();
           throw new Error(data?.error?.message ?? `HTTP ${res.status}`);
         }
 
@@ -285,7 +285,7 @@ function useStreamingChat() {
             }
 
             if (parsed.error) {
-              if (parsed.error.code === "INSUFFICIENT_TOKENS") notifyTokensExhausted();
+              if (parsed.error.code === "INSUFFICIENT_TOKENS" || parsed.error.code === "WORKSPACE_EXPIRED") notifyTokensExhausted();
               throw new Error(parsed.error.message ?? "Streaming error");
             }
             if (parsed.text) pushChunk(parsed.text);

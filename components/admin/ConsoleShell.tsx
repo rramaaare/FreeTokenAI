@@ -32,7 +32,7 @@ const NAV: Record<ConsoleRole, NavGroup[]> = {
     {
       label: 'Manajemen',
       items: [
-        { href: '/admin/users', label: 'Pengguna & Kasir', icon: Users },
+        { href: '/admin/users', label: 'Kafe, Kasir & Pengguna', icon: Users },
         { href: '/admin/packages', label: 'Master Paket', icon: Package },
       ],
     },
@@ -43,9 +43,9 @@ const NAV: Record<ConsoleRole, NavGroup[]> = {
     {
       label: 'Sistem',
       items: [
-        { href: '/admin/api-keys', label: 'Monitoring API Key', icon: KeyRound },
-        { href: '/admin/models', label: 'Model & API Key', icon: SlidersHorizontal },
-        { href: '/admin/rbac', label: 'Matriks Hak Akses', icon: ShieldCheck },
+        { href: '/admin/api-keys', label: 'API Key Pelanggan', icon: KeyRound },
+        { href: '/admin/models', label: 'Provider & Model AI', icon: SlidersHorizontal },
+        { href: '/admin/rbac', label: 'Peran & Hak Akses', icon: ShieldCheck },
       ],
     },
   ],

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { claimUrl } from "@/lib/app-url";
 import { corsHeaders, requireAdmin, requireAllowedOrigin } from "@/lib/auth";
 import { sql } from "@/lib/db";
+import { roleAllows, type PermissionKey } from "@/lib/permissions";
+import { RECEIPT_VALID_DAYS, sweepExpiredReceipts } from "@/lib/receipts";
 
 // ponytail: PRD §7.1 — POST /api/v1/admin/receipts/generate, idempoten via
 // pos_reference_id UNIQUE (PRD §5.2). Kuota cafe dipotong atomik
@@ -19,6 +21,7 @@ type ReceiptOut = {
   purchase_type: string | null;
   rupiah_amount: number | null;
   created_at: string;
+  expires_at: string | null;
 };
 
 // ponytail: format RST-<random 6 digit> (contoh PRD §4.1 RST-98234). Retry kecil
@@ -78,6 +81,8 @@ export async function POST(req: Request) {
     cafeId = rawCafe;
   }
 
+  // token struk kedaluwarsa kembali ke saldo dulu supaya bisa langsung dipakai lagi.
+  await sweepExpiredReceipts(cafeId);
   const cafe = (await sql`
     SELECT name, prepaid_token_balance, retail_rupiah_per_token, bonus_rupiah_per_token
     FROM cafes WHERE id = ${cafeId} LIMIT 1`) as unknown as {
@@ -130,6 +135,10 @@ export async function POST(req: Request) {
     }
   }
 
+  const perm: PermissionKey = purchaseType === "product" ? "receipt.product" : purchaseType === "package" ? "receipt.package" : "receipt.retail";
+  if (!(await roleAllows(auth.user.role, perm)))
+    return err(origin, 403, "PERMISSION_DENIED", "Mode struk ini dinonaktifkan admin untuk kasir.");
+
   // fast-fail kuota (tanpa baca-tulis): saldo jelas tak cukup -> 402 langsung.
   // Pengecekan final tetap UPDATE atomik di dalam transaksi.
   if (cafe[0].prepaid_token_balance < tokens)
@@ -140,14 +149,15 @@ export async function POST(req: Request) {
     try {
       const out = (await sql.begin(async (tx: any) => {
         const ins = (await tx`
-          INSERT INTO receipts (code, pos_reference_id, tokens_granted, cafe_id, token_package_id, created_by_user_id, purchase_type, rupiah_amount)
-          VALUES (${code}, ${ref}, ${tokens}, ${cafeId}, ${pkgId}, ${auth.user.id}, ${purchaseType}, ${rupiah})
+          INSERT INTO receipts (code, pos_reference_id, tokens_granted, cafe_id, token_package_id, created_by_user_id, purchase_type, rupiah_amount, expires_at)
+          VALUES (${code}, ${ref}, ${tokens}, ${cafeId}, ${pkgId}, ${auth.user.id}, ${purchaseType}, ${rupiah},
+                  now() + make_interval(days => ${RECEIPT_VALID_DAYS}))
           ON CONFLICT (pos_reference_id) DO NOTHING
-          RETURNING id, code, tokens_granted, purchase_type, rupiah_amount, created_at`) as unknown as ReceiptOut[];
+          RETURNING id, code, tokens_granted, purchase_type, rupiah_amount, created_at, expires_at`) as unknown as ReceiptOut[];
         if (!ins[0]) {
           // idempoten: sudah pernah dibuat — kembalikan receipt yang sama (PRD §5.2).
           const ex = (await tx`
-            SELECT id, code, tokens_granted, purchase_type, rupiah_amount, created_at
+            SELECT id, code, tokens_granted, purchase_type, rupiah_amount, created_at, expires_at
             FROM receipts WHERE pos_reference_id = ${ref} LIMIT 1`) as unknown as ReceiptOut[];
           return { kind: "existing" as const, receipt: ex[0] };
         }
@@ -170,6 +180,7 @@ export async function POST(req: Request) {
           purchase_type: r.purchase_type,
           rupiah_amount: r.rupiah_amount,
           created_at: r.created_at,
+          expires_at: r.expires_at,
           pos_reference_id: ref,
           cafe_name: cafe[0].name,
         },

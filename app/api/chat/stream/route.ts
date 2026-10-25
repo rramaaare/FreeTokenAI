@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { resolveRoute, streamChat, supportsVision, type AiRoute, type StreamUsage } from "@/lib/ai-router";
+import { permissionDenied } from "@/lib/permissions";
+import { resolveRoute, streamChat, supportsVision, type StreamUsage } from "@/lib/ai-router";
 import { DEFAULT_CHAT_MODEL } from "@/lib/chat-models";
 import { buildChatContext, loadSessionAttachments } from "@/lib/chat-context";
 import {
@@ -17,6 +18,7 @@ import { evaluateAiRequest, gatekeeperAccessResponse, gatekeeperBlockResponse } 
 import {
   chatCost,
   InsufficientTokensError,
+  insufficientMessage,
   withTokensStream,
   workspaceIdForRequest,
 } from "@/lib/billing";
@@ -74,6 +76,8 @@ async function hasImageAttachments(wsId: string, attachmentIds: string[]): Promi
 }
 
 export async function POST(req: Request) {
+  const denied = await permissionDenied("customer", "ai.chat");
+  if (denied) return denied;
   let body: Body;
   try {
     body = await req.json();
@@ -352,13 +356,10 @@ export async function POST(req: Request) {
         });
       } catch (e) {
         if (e instanceof InsufficientTokensError) {
-          const insufficientMsg = L(
-            `Saldo Token tidak cukup (sisa ${e.balance}). Klaim QR / top up dulu.`,
-            `Not enough Tokens (balance ${e.balance}). Claim a QR / top up first.`,
-          );
+          const insufficientMsg = L(insufficientMessage(e, "id"), insufficientMessage(e, "en"));
           enqueue({
             error: {
-              code: "INSUFFICIENT_TOKENS",
+              code: e.expired ? "WORKSPACE_EXPIRED" : "INSUFFICIENT_TOKENS",
               message: insufficientMsg,
             },
             gatekeeper: {
@@ -366,7 +367,7 @@ export async function POST(req: Request) {
               service: "chat",
               category: "credit",
               risk_level: "low",
-              reason: "Saldo workspace tidak mencukupi biaya permintaan.",
+              reason: e.expired ? "Masa aktif workspace sudah lewat." : "Saldo workspace tidak mencukupi biaya permintaan.",
               user_message: insufficientMsg,
             },
           });

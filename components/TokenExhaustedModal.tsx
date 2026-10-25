@@ -5,7 +5,7 @@ import { CheckCircle2, Coins, Loader2, ReceiptText, Wallet, X } from "lucide-rea
 import { useT } from "@/lib/i18n";
 import { notifyWorkspaceChanged } from "@/lib/settings";
 
-type BalanceResponse = { remaining?: number };
+type BalanceResponse = { remaining?: number; isExpired?: boolean };
 
 export default function TokenExhaustedModal({ onClose }: { onClose: () => void }) {
   const { t, locale } = useT();
@@ -13,6 +13,8 @@ export default function TokenExhaustedModal({ onClose }: { onClose: () => void }
 
   const [balance, setBalance] = useState<number | null>(null);
   const [loadingBalance, setLoadingBalance] = useState(true);
+  // masa aktif lewat (saldo bisa masih ada) -> judul & ajakan klaim berbeda
+  const [expired, setExpired] = useState(false);
 
   const [code, setCode] = useState("");
   const [claiming, setClaiming] = useState(false);
@@ -36,6 +38,7 @@ export default function TokenExhaustedModal({ onClose }: { onClose: () => void }
       const data = (await res.json()) as BalanceResponse;
       const remaining = Number(data.remaining ?? 0);
       setBalance(remaining);
+      setExpired(Boolean(data.isExpired));
       return remaining;
     } catch {
       return null;
@@ -123,10 +126,10 @@ export default function TokenExhaustedModal({ onClose }: { onClose: () => void }
             </div>
             <div>
               <h2 className="text-lg font-bold text-neutral-900 dark:text-white">
-                {t("tokens.title")}
+                {expired ? t("tokens.expiredTitle") : t("tokens.title")}
               </h2>
               <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                {t("tokens.desc")}
+                {expired ? t("tokens.expiredDesc") : t("tokens.desc")}
               </p>
             </div>
           </div>

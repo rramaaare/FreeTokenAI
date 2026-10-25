@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { encryptSecret, maskSecret } from "@/lib/secret-box";
 import {
+  cleanApiKey,
   discoverModels,
   invalidateRegistry,
   listProviders,
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
   const slug = String(body.slug ?? "").trim().toLowerCase().slice(0, 50);
   const name = String(body.name ?? "").trim().slice(0, 100);
   const baseUrl = String(body.base_url ?? "").trim().slice(0, 255);
-  const apiKey = String(body.api_key ?? "").trim();
+  const apiKey = cleanApiKey(String(body.api_key ?? ""));
   if (!/^[a-z0-9][a-z0-9_-]*$/.test(slug) || !name)
     return NextResponse.json({ error: { code: "INVALID_INPUT", message: "Slug (huruf/angka) dan nama wajib." } }, { status: 400 });
   if (!apiKey || apiKey.length < 8)

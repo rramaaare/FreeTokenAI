@@ -6,14 +6,30 @@ import { Badge, EmptyState, Loading, PageHeader, cardCls, inputCls } from "@/com
 import PrintReceipt from "@/components/kasir/PrintReceipt";
 import { useKasir } from "@/components/kasir/KasirShell";
 
-type ReceiptRow = { code: string; tokens: number; claimed: boolean; claimed_at: string | null; created_at: string };
-type Filter = "all" | "unclaimed" | "claimed";
+type Status = "unclaimed" | "claimed" | "expired";
+type ReceiptRow = {
+  code: string;
+  tokens: number;
+  claimed: boolean;
+  status: Status;
+  claimed_at: string | null;
+  created_at: string;
+  expires_at: string | null;
+};
+type Filter = "all" | Status;
 
 const FILTERS: { value: Filter; label: string }[] = [
   { value: "all", label: "Semua" },
   { value: "unclaimed", label: "Belum diklaim" },
   { value: "claimed", label: "Sudah diklaim" },
+  { value: "expired", label: "Kedaluwarsa" },
 ];
+
+const STATUS_BADGE: Record<Status, { label: string; short: string; tone: "success" | "warning" | "neutral" }> = {
+  claimed: { label: "Sudah diklaim", short: "✓ Diklaim", tone: "success" },
+  unclaimed: { label: "Belum diklaim", short: "Belum", tone: "warning" },
+  expired: { label: "Kedaluwarsa", short: "Kedaluwarsa", tone: "neutral" },
+};
 
 type Lookup = {
   receipt: {
@@ -23,6 +39,9 @@ type Lookup = {
     cafe_name: string | null;
     claimed: boolean;
     claimed_at: string | null;
+    status: Status;
+    expires_at: string | null;
+    refunded_at: string | null;
     claim_url: string;
     purchase_type: string | null;
     rupiah_amount: number | null;
@@ -139,11 +158,7 @@ export default function KasirStatusPage() {
         <div className={`${cardCls} p-5`}>
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono text-sm font-bold text-neutral-900 dark:text-white">{result.receipt.code}</span>
-            {result.receipt.claimed ? (
-              <Badge tone="success">Sudah diklaim</Badge>
-            ) : (
-              <Badge tone="warning">Belum diklaim</Badge>
-            )}
+            <Badge tone={STATUS_BADGE[result.receipt.status].tone}>{STATUS_BADGE[result.receipt.status].label}</Badge>
             {result.receipt.cafe_name && <span className="ml-auto text-[11px] text-neutral-400">{result.receipt.cafe_name}</span>}
           </div>
 
@@ -156,6 +171,22 @@ export default function KasirStatusPage() {
               <dt className="text-neutral-400">Dibuat</dt>
               <dd className="font-semibold text-neutral-800 dark:text-neutral-100">{dt(result.receipt.created_at)}</dd>
             </div>
+            {result.receipt.status !== "claimed" && (
+              <div className="rounded-lg bg-neutral-50 p-2.5 dark:bg-neutral-900/50">
+                <dt className="text-neutral-400">{result.receipt.status === "expired" ? "Kedaluwarsa sejak" : "Bisa diklaim sampai"}</dt>
+                <dd className={`font-semibold ${result.receipt.status === "expired" ? "text-red-500" : "text-neutral-800 dark:text-neutral-100"}`}>
+                  {dt(result.receipt.expires_at)}
+                </dd>
+              </div>
+            )}
+            {result.receipt.refunded_at && (
+              <div className="rounded-lg bg-neutral-50 p-2.5 dark:bg-neutral-900/50">
+                <dt className="text-neutral-400">Token dikembalikan ke saldo cafe</dt>
+                <dd className="font-semibold text-emerald-600 dark:text-emerald-400">
+                  +{n(result.receipt.tokens)} · {dt(result.receipt.refunded_at)}
+                </dd>
+              </div>
+            )}
             {c && (
               <>
                 <div className="rounded-lg bg-neutral-50 p-2.5 dark:bg-neutral-900/50">
@@ -183,12 +214,14 @@ export default function KasirStatusPage() {
           </dl>
 
           <p className="mt-3 text-[11px] text-neutral-400">
-            {result.receipt.claimed
+            {result.receipt.status === "claimed"
               ? "Untuk top-up, buat struk baru — pelanggan klaim dengan No. WA/email yang sama (atau sambil login), token masuk ke saldo yang sama."
-              : "Pelanggan bisa mengklaim struk ini di halaman /claim."}
+              : result.receipt.status === "expired"
+                ? "Struk ini tidak diklaim sampai batas waktu, jadi tidak bisa dipakai lagi. Tokennya sudah kembali ke saldo prepaid cafe — buatkan struk baru bila pelanggan masih butuh."
+                : "Pelanggan bisa mengklaim struk ini di halaman /claim sebelum batas waktu di atas."}
           </p>
 
-          {!result.receipt.claimed && (
+          {result.receipt.status === "unclaimed" && (
             <div className="mt-4 border-t border-neutral-100 pt-4 dark:border-neutral-700">
               <button
                 type="button"
@@ -261,7 +294,7 @@ export default function KasirStatusPage() {
                   }`}
                 >
                   <span className="font-mono text-sm font-semibold text-neutral-900 dark:text-white">{r.code}</span>
-                  <Badge tone={r.claimed ? "success" : "warning"}>{r.claimed ? "Diklaim" : "Belum"}</Badge>
+                  <Badge tone={STATUS_BADGE[r.status].tone}>{STATUS_BADGE[r.status].short}</Badge>
                   <span className="text-xs tabular-nums text-neutral-600 dark:text-neutral-300">{n(r.tokens)} token</span>
                   <span className="ml-auto text-[11px] text-neutral-400">{dt(r.created_at)}</span>
                 </button>

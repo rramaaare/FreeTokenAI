@@ -16,8 +16,6 @@ export type Pkg = {
   rupiah_amount: number;
   tokens_granted: number;
   sort_order: number;
-  default_expires_days?: number;
-  max_expires_days?: number;
 };
 
 type KasirCtx = {
@@ -38,15 +36,6 @@ export function useKasir() {
 export function idr(n: number) {
   return `Rp${n.toLocaleString("id-ID")}`;
 }
-
-export const KEY_STATUS: Record<string, { label: string; tone: "success" | "warning" | "danger" | "neutral" | "info" }> = {
-  active: { label: "Aktif", tone: "success" },
-  expiring: { label: "Hampir habis", tone: "warning" },
-  exhausted: { label: "Kuota habis", tone: "warning" },
-  expired: { label: "Kedaluwarsa", tone: "danger" },
-  revoked: { label: "Dicabut", tone: "danger" },
-  disabled: { label: "Nonaktif", tone: "neutral" },
-};
 
 export default function KasirShell({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<KasirUser | null>(null);

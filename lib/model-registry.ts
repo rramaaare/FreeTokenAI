@@ -184,7 +184,15 @@ export async function providerKey(slug: string): Promise<string | null> {
       SELECT api_key_encrypted FROM providers
       WHERE slug = ${slug} AND is_active = TRUE AND api_key_encrypted IS NOT NULL
       LIMIT 1`) as unknown as { api_key_encrypted: string }[];
-    if (rows[0]) key = decryptSecret(rows[0].api_key_encrypted);
+    if (rows[0]) {
+      try {
+        key = cleanApiKey(decryptSecret(rows[0].api_key_encrypted));
+      } catch {
+        console.error(
+          `[model-registry] API key ${slug} di DB tidak bisa didekripsi — APP_ENCRYPTION_KEY berbeda dari saat key disimpan. Simpan ulang key di /admin/models.`,
+        );
+      }
+    }
   } catch {
     // DB error -> lanjut ke fallback env
   }
@@ -196,11 +204,25 @@ export async function providerKey(slug: string): Promise<string | null> {
       gemini: process.env.GEMINI_API_KEY,
       vio: process.env.VIO_API_KEY,
     };
-    key = envMap[slug] ?? null;
+    key = cleanApiKey(envMap[slug] ?? "") || null;
   }
   kc.set(slug, { at: Date.now(), key });
   return key;
 }
+
+/**
+ * Rapikan API key hasil tempel: spasi/baris baru/karakter tak terlihat, tanda
+ * kutip, dan awalan "Bearer " (sering ikut tersalin dari dashboard provider
+ * atau env Vercel) membuat provider membalas 401 walau key-nya benar.
+ */
+export function cleanApiKey(raw: string): string {
+  return String(raw ?? "")
+    .replace(/[\s\u200B-\u200D\uFEFF]/g, "")
+    .replace(/^["'`]+|["'`]+$/g, "")
+    .replace(/^Bearer/i, "");
+}
+
+export const PROVIDER_USER_AGENT = "FreeTokenAI/1.0 (+server)";
 
 // Root Gemini tanpa suffix versi (/v1beta, /v1, /v1beta/openai) supaya admin
 // boleh menempelkan URL apa pun dari dokumentasi tanpa dobel path.
@@ -214,12 +236,17 @@ function geminiRoot(baseUrl: string): string {
 // Tidak menyimpan apa pun — hanya GET ringan ke endpoint listing/health.
 // 401/403 = key ditolak; selain itu dianggap terjangkau (beberapa provider tidak
 // punya endpoint /models publik, jadi kegagalan jaringan dibedakan dari auth fail).
+function maskKey(k: string) {
+  return k.length <= 10 ? "****" : `${k.slice(0, 7)}…${k.slice(-4)}`;
+}
+
 export async function testProviderKey(
   slug: string,
   baseUrl: string,
   key: string,
 ): Promise<{ ok: boolean; message: string }> {
   const base = (baseUrl || "").replace(/\/+$/, "");
+  key = cleanApiKey(key);
   const probes: { url: string; headers: Record<string, string> }[] = [];
 
   if (slug === "groq" || base.includes("groq")) {
@@ -236,10 +263,31 @@ export async function testProviderKey(
 
   for (const p of probes) {
     try {
-      const res = await fetch(p.url, { headers: p.headers, cache: "no-store", signal: AbortSignal.timeout(10_000) });
+      const res = await fetch(p.url, {
+        headers: { ...p.headers, "User-Agent": PROVIDER_USER_AGENT, Accept: "application/json" },
+        cache: "no-store",
+        signal: AbortSignal.timeout(10_000),
+      });
       if (res.status === 401 || res.status === 403) {
         const detail = await res.text().catch(() => "");
-        return { ok: false, message: `Key ditolak provider (HTTP ${res.status}). ${detail.slice(0, 200)}` };
+        // 403 berupa halaman HTML / header cf-mitigated = firewall Cloudflare provider
+        // memblokir IP server (mis. Vercel), bukan key yang salah.
+        if (res.headers.get("cf-mitigated") || /^\s*</.test(detail))
+          return {
+            ok: false,
+            message: `Request diblokir firewall provider (HTTP ${res.status}) — IP server ini ditolak, bukan key yang salah. Minta provider meng-whitelist server / region deploy.`,
+          };
+        const reason = (() => {
+          try {
+            return (JSON.parse(detail) as { error?: { message?: string }; message?: string }).error?.message ?? detail;
+          } catch {
+            return detail;
+          }
+        })().slice(0, 160);
+        return {
+          ok: false,
+          message: `Key ditolak provider (HTTP ${res.status}: ${reason || "unauthorized"}). Pastikan key disalin utuh (${maskKey(key)}, ${key.length} karakter) dan masih aktif di dashboard provider.`,
+        };
       }
       if (!res.ok) {
         // server provider hidup tapi endpoint probe tidak ada / error lain -> key tetap diterima

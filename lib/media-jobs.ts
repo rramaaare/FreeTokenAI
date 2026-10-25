@@ -116,7 +116,7 @@ export function startMediaJob(args: {
       }
       const data = await res.json();
       if (!res.ok) {
-        if (data?.error?.code === "INSUFFICIENT_TOKENS") notifyTokensExhausted();
+        if (data?.error?.code === "INSUFFICIENT_TOKENS" || data?.error?.code === "WORKSPACE_EXPIRED") notifyTokensExhausted();
         throw new Error(data?.error?.message || `Gagal (${res.status})`);
       }
       // saldo sudah dipotong server saat POST diterima — segarkan saldo TopBar.

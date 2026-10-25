@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { permissionDenied } from "@/lib/permissions";
 import { requireAuth } from "@/lib/auth";
 import { recordVioJobs, startGeminiVideo } from "@/lib/ai-media";
 import { resolveRoute } from "@/lib/ai-router";
@@ -19,6 +20,8 @@ export const maxDuration = 60;
 const VIDEO_MODELS = ["veo-3.1-lite", "veo-3.1-fast", "veo-3.1-quality"];
 
 export async function POST(req: Request) {
+  const denied = await permissionDenied("customer", "ai.video");
+  if (denied) return denied;
   try {
     const contentType = req.headers.get("content-type") || "";
     let prompt = "";
@@ -140,7 +143,7 @@ export async function POST(req: Request) {
     try {
       return await withTokens(wsId, cost, run, { modelId: finalModel, endpointType: "video" });
     } catch (e) {
-      if (e instanceof InsufficientTokensError) return insufficient(e.balance, "video");
+      if (e instanceof InsufficientTokensError) return insufficient(e, "video");
       throw e;
     }
   } catch (e) {

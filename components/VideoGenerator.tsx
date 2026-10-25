@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Clock, Download, ImageIcon, RotateCcw, Sparkles, Trash2, VideoIcon, X, Zap } from "lucide-react";
+import { ChevronDown, Download, ImageIcon, RotateCcw, Sparkles, Trash2, VideoIcon, X, Zap } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { loadMediaHistory, removeMediaAsset, type MediaSession } from "@/lib/media-history";
 import { useT, type Lang, type TKey } from "@/lib/i18n";
@@ -77,15 +77,6 @@ const DEFAULT_I2V_PROMPT: Record<Lang, string> = {
 };
 
 type FeedItem = { url: string; prompt: string; model: string; session: MediaSession; mode?: VideoMode };
-
-function timeAgo(t: (key: TKey, vars?: Record<string, string | number>) => string, iso: string): string {
-  const mins = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
-  if (mins < 1) return t("media.justNow");
-  if (mins < 60) return t("media.minutesAgo", { n: mins });
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return t("media.hoursAgo", { n: hours });
-  return t("media.daysAgo", { n: Math.floor(hours / 24) });
-}
 
 function expiryLabel(t: (key: TKey, vars?: Record<string, string | number>) => string, iso: string): string {
   const daysLeft = Math.ceil((new Date(iso).getTime() + 30 * 86400000 - Date.now()) / 86400000);

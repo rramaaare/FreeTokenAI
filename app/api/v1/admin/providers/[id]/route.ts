@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { encryptSecret, maskSecret } from "@/lib/secret-box";
-import { invalidateRegistry, listProviders, parseCapabilities, testProviderKey } from "@/lib/model-registry";
+import { cleanApiKey, invalidateRegistry, listProviders, parseCapabilities, testProviderKey } from "@/lib/model-registry";
 
 // Edit provider: nama/base_url/kebutuhan (capabilities), toggle aktif, atau
 // GANTI key (divalidasi handshake dulu — sama seperti saat tambah).
@@ -40,7 +40,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       await sql`UPDATE providers SET is_active = ${body.is_active} WHERE id = ${id}`;
 
     if (typeof body.api_key === "string" && body.api_key.trim()) {
-      const key = body.api_key.trim();
+      const key = cleanApiKey(body.api_key);
       if (key.length < 8)
         return NextResponse.json({ error: { code: "INVALID_KEY", message: "API key terlalu pendek (min 8)." } }, { status: 400 });
       const baseUrl = typeof body.base_url === "string" ? body.base_url.trim() : rows[0].base_url;
