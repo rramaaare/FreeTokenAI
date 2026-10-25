@@ -18,7 +18,6 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Users,
-  Wallet,
   X,
 } from 'lucide-react';
 
@@ -56,14 +55,7 @@ const NAV: Record<ConsoleRole, NavGroup[]> = {
       items: [
         { href: '/kasir', label: 'Dashboard', icon: LayoutDashboard },
         { href: '/kasir/struk', label: 'Buat Struk', icon: ReceiptText },
-        { href: '/kasir/keys', label: 'API Key Saya', icon: KeyRound },
-      ],
-    },
-    {
-      label: 'Saldo & Layanan',
-      items: [
-        { href: '/kasir/status', label: 'Cek Status Key', icon: Search },
-        { href: '/kasir/topup', label: 'Top-Up Key', icon: Wallet },
+        { href: '/kasir/status', label: 'Cek Status Struk', icon: Search },
       ],
     },
   ],

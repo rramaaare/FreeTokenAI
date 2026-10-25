@@ -3,12 +3,28 @@ import { corsHeaders, requireAdmin, requireAllowedOrigin } from "@/lib/auth";
 import { sql } from "@/lib/db";
 
 // ponytail: dashboard kasir = 1 endpoint scoped ke cafe milik kasir (JWT
-// cafe_id). Atribusi usage sama seperti /admin/cafes/:id/usage:
-// COALESCE(usage_logs.cafe_id, workspaces.cafe_id) untuk baris lama.
+// cafe_id). Fokus ke penjualan struk (bonus produk vs token ketengan), struk
+// yang belum diklaim, dan sisa saldo prepaid cafe. Pemakaian AI pelanggan
+// tetap diringkas — atribusi COALESCE(usage_logs.cafe_id, workspaces.cafe_id)
+// sama seperti /admin/cafes/:id/usage untuk baris lama.
+// "Ketengan" = retail + paket + manual/legacy (semua struk yang bukan bonus produk).
 export async function OPTIONS(req: Request) {
   const origin = requireAllowedOrigin(req);
   return new NextResponse(null, { status: 204, headers: corsHeaders(origin) });
 }
+
+type SalesRow = {
+  receipts: number;
+  rupiah: number;
+  tokens: number;
+  product_receipts: number;
+  product_rupiah: number;
+  product_tokens: number;
+  retail_receipts: number;
+  retail_rupiah: number;
+  retail_tokens: number;
+  claimed: number;
+};
 
 export async function GET(req: Request) {
   const origin = requireAllowedOrigin(req);
@@ -48,79 +64,78 @@ export async function GET(req: Request) {
         { status: 404, headers: corsHeaders(origin) },
       );
 
-    const [summary, byDay, byEndpoint, recent, keys, transactions] = (await Promise.all([
+    const [today, week, byDay, unclaimed, recent, usage, byEndpoint, transactions] = (await Promise.all([
+      salesSince(cafeId, sql`current_date`),
+      salesSince(cafeId, sql`current_date - interval '6 days'`),
+      sql`
+        SELECT to_char(created_at, 'YYYY-MM-DD') AS day,
+          COALESCE(SUM(tokens_granted) FILTER (WHERE purchase_type = 'product'), 0)::int AS product,
+          COALESCE(SUM(tokens_granted) FILTER (WHERE purchase_type IS DISTINCT FROM 'product'), 0)::int AS retail,
+          COALESCE(SUM(rupiah_amount) FILTER (WHERE purchase_type IS DISTINCT FROM 'product'), 0)::bigint AS retail_rupiah
+        FROM receipts
+        WHERE cafe_id = ${cafeId} AND created_at >= current_date - interval '6 days'
+        GROUP BY 1 ORDER BY 1`,
+      sql`
+        SELECT COUNT(*)::int AS receipts, COALESCE(SUM(tokens_granted), 0)::int AS tokens,
+          MIN(created_at) AS oldest
+        FROM receipts WHERE cafe_id = ${cafeId} AND COALESCE(is_claimed, FALSE) = FALSE`,
+      sql`
+        SELECT code, tokens_granted AS tokens, purchase_type, rupiah_amount, COALESCE(is_claimed, FALSE) AS claimed, created_at
+        FROM receipts WHERE cafe_id = ${cafeId}
+        ORDER BY created_at DESC LIMIT 8`,
       sql`
         SELECT
           COALESCE(SUM(ul.tokens_burned) FILTER (WHERE ul.created_at >= current_date), 0)::int AS today_tokens,
-          COUNT(*) FILTER (WHERE ul.created_at >= current_date)::int AS today_requests,
-          COALESCE(SUM(ul.tokens_burned) FILTER (WHERE ul.created_at >= now() - interval '7 days'), 0)::int AS week_tokens,
-          COUNT(*) FILTER (WHERE ul.created_at >= now() - interval '7 days')::int AS week_requests
-        FROM usage_logs ul LEFT JOIN workspaces w ON w.id = ul.workspace_id
-        WHERE COALESCE(ul.cafe_id, w.cafe_id) = ${cafeId} AND ul.status = 'success'`,
-      sql`
-        SELECT to_char(ul.created_at, 'YYYY-MM-DD') AS day, COALESCE(SUM(ul.tokens_burned), 0)::int AS tokens
+          COALESCE(SUM(ul.tokens_burned), 0)::int AS week_tokens,
+          COUNT(DISTINCT ul.workspace_id) FILTER (WHERE ul.created_at >= current_date)::int AS today_customers,
+          COUNT(DISTINCT ul.workspace_id)::int AS week_customers
         FROM usage_logs ul LEFT JOIN workspaces w ON w.id = ul.workspace_id
         WHERE COALESCE(ul.cafe_id, w.cafe_id) = ${cafeId} AND ul.status = 'success'
-          AND ul.created_at >= current_date - interval '6 days'
-        GROUP BY 1 ORDER BY 1`,
+          AND ul.created_at >= current_date - interval '6 days'`,
       sql`
         SELECT ul.endpoint_type, COUNT(*)::int AS requests, COALESCE(SUM(ul.tokens_burned), 0)::int AS tokens
         FROM usage_logs ul LEFT JOIN workspaces w ON w.id = ul.workspace_id
         WHERE COALESCE(ul.cafe_id, w.cafe_id) = ${cafeId} AND ul.status = 'success'
-          AND ul.created_at >= now() - interval '7 days'
+          AND ul.created_at >= current_date - interval '6 days'
         GROUP BY ul.endpoint_type ORDER BY tokens DESC`,
-      sql`
-        SELECT ul.created_at, ul.endpoint_type, ul.model_id, ul.tokens_burned, ul.status, k.key_prefix
-        FROM usage_logs ul
-        LEFT JOIN workspaces w ON w.id = ul.workspace_id
-        LEFT JOIN api_keys k ON k.id = ul.api_key_id
-        WHERE COALESCE(ul.cafe_id, w.cafe_id) = ${cafeId}
-        ORDER BY ul.created_at DESC LIMIT 10`,
-      sql`
-        SELECT key_prefix, name, token_quota, tokens_used, expires_at, revoked_at, is_active, last_used_at
-        FROM api_keys WHERE cafe_id = ${cafeId} ORDER BY created_at DESC LIMIT 100`,
       sql`
         SELECT type, amount, balance_after, note, created_at
         FROM cafe_token_transactions WHERE cafe_id = ${cafeId}
         ORDER BY created_at DESC LIMIT 5`,
     ])) as unknown as [
-      { today_tokens: number; today_requests: number; week_tokens: number; week_requests: number }[],
-      { day: string; tokens: number }[],
+      SalesRow[],
+      SalesRow[],
+      { day: string; product: number; retail: number; retail_rupiah: string | number }[],
+      { receipts: number; tokens: number; oldest: string | null }[],
+      { code: string; tokens: number; purchase_type: string | null; rupiah_amount: number | null; claimed: boolean; created_at: string }[],
+      { today_tokens: number; week_tokens: number; today_customers: number; week_customers: number }[],
       { endpoint_type: string; requests: number; tokens: number }[],
-      { created_at: string; endpoint_type: string | null; model_id: string; tokens_burned: number; status: string; key_prefix: string | null }[],
-      { key_prefix: string; name: string | null; token_quota: number; tokens_used: number; expires_at: string | null; revoked_at: string | null; is_active: boolean; last_used_at: string | null }[],
       { type: string; amount: number; balance_after: number; note: string | null; created_at: string }[],
     ];
 
-    const now = Date.now();
-    const mappedKeys = keys.map((k) => ({
-      ...k,
-      remaining: Math.max(0, (k.token_quota ?? 0) - (k.tokens_used ?? 0)),
-      status: k.revoked_at
-        ? "revoked"
-        : k.expires_at && new Date(k.expires_at).getTime() < now
-          ? "expired"
-          : !k.is_active
-            ? "disabled"
-            : "active",
-    }));
-
-    const byDayMap = new Map(byDay.map((d) => [d.day, d.tokens]));
+    const byDayMap = new Map(byDay.map((d) => [d.day, d]));
     const days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-      return { day: key, tokens: byDayMap.get(key) ?? 0 };
+      const row = byDayMap.get(key);
+      return { day: key, product: row?.product ?? 0, retail: row?.retail ?? 0, retail_rupiah: Number(row?.retail_rupiah ?? 0) };
     });
+
+    // estimasi saldo cafe cukup berapa hari, dari rata-rata token terbit 7 hari.
+    const avgDaily = days.reduce((s, d) => s + d.product + d.retail, 0) / 7;
+    const daysLeft = avgDaily > 0 ? Math.floor(cafes[0].token_balance / avgDaily) : null;
 
     return NextResponse.json(
       {
         cafe: cafes[0],
-        summary: summary[0] ?? { today_tokens: 0, today_requests: 0, week_tokens: 0, week_requests: 0 },
+        sales: { today: normalize(today[0]), week: normalize(week[0]) },
         by_day: days,
+        balance_forecast: { avg_daily_tokens: Math.round(avgDaily), days_left: daysLeft },
+        unclaimed: unclaimed[0] ?? { receipts: 0, tokens: 0, oldest: null },
+        recent_receipts: recent,
+        usage: usage[0] ?? { today_tokens: 0, week_tokens: 0, today_customers: 0, week_customers: 0 },
         by_endpoint: byEndpoint,
-        recent,
-        keys: mappedKeys,
         transactions,
         generated_at: new Date().toISOString(),
       },
@@ -133,4 +148,34 @@ export async function GET(req: Request) {
       { status: 500, headers: corsHeaders(origin) },
     );
   }
+}
+
+// ponytail: nominal "ketengan" = uang token yang dibayar pelanggan; nominal
+// "produk" = total belanja (bukan pendapatan token), jadi dilaporkan terpisah.
+function salesSince(cafeId: string, since: ReturnType<typeof sql>) {
+  return sql`
+    SELECT
+      COUNT(*)::int AS receipts,
+      COALESCE(SUM(tokens_granted), 0)::int AS tokens,
+      COUNT(*) FILTER (WHERE purchase_type = 'product')::int AS product_receipts,
+      COALESCE(SUM(rupiah_amount) FILTER (WHERE purchase_type = 'product'), 0)::bigint AS product_rupiah,
+      COALESCE(SUM(tokens_granted) FILTER (WHERE purchase_type = 'product'), 0)::int AS product_tokens,
+      COUNT(*) FILTER (WHERE purchase_type IS DISTINCT FROM 'product')::int AS retail_receipts,
+      COALESCE(SUM(rupiah_amount) FILTER (WHERE purchase_type IS DISTINCT FROM 'product'), 0)::bigint AS retail_rupiah,
+      COALESCE(SUM(tokens_granted) FILTER (WHERE purchase_type IS DISTINCT FROM 'product'), 0)::int AS retail_tokens,
+      COUNT(*) FILTER (WHERE is_claimed)::int AS claimed
+    FROM receipts
+    WHERE cafe_id = ${cafeId} AND created_at >= ${since}`;
+}
+
+// bigint dari postgres datang sebagai string.
+function normalize(r: SalesRow | undefined) {
+  const z = (v: unknown) => Number(v ?? 0);
+  return {
+    receipts: z(r?.receipts),
+    tokens: z(r?.tokens),
+    claimed: z(r?.claimed),
+    product: { receipts: z(r?.product_receipts), rupiah: z(r?.product_rupiah), tokens: z(r?.product_tokens) },
+    retail: { receipts: z(r?.retail_receipts), rupiah: z(r?.retail_rupiah), tokens: z(r?.retail_tokens) },
+  };
 }

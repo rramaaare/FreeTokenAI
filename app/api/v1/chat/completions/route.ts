@@ -13,8 +13,8 @@ import { evaluateAiRequest, gatekeeperAccessResponse, gatekeeperBlockResponse } 
 
 // ponytail: PRD 6 — model katalog dipetakan ke provider gratis yang sudah terbukti hidup.
 const MODEL_MAP: Record<string, string> = {
-  "resto-chat-fast": "openai/gpt-oss-20b",
-  "resto-chat-pro": "openai/gpt-oss-120b",
+  "freetokenai-chat-fast": "openai/gpt-oss-20b",
+  "freetokenai-chat-pro": "openai/gpt-oss-120b",
   "openai/gpt-oss-20b": "openai/gpt-oss-20b",
   "openai/gpt-oss-120b": "openai/gpt-oss-120b",
 };
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
   if (!m)
     return gatekeeperAccessResponse(
       "developer_api",
-      "API key tidak valid. Generate di halaman Developer API (/dashboard/developer) lalu pakai: Authorization: Bearer rst_live_... Model: resto-chat-fast / resto-chat-pro.",
+      "API key tidak valid. Generate di halaman Developer API (/dashboard/developer) lalu pakai: Authorization: Bearer rst_live_... Model: freetokenai-chat-fast / freetokenai-chat-pro.",
     );
   const apiKey = m[1];
   const valid = await validateApiKey(apiKey);
@@ -63,14 +63,14 @@ export async function POST(req: Request) {
     .join("\n");
   const gate = gatekeeperBlockResponse(evaluateAiRequest(gateInput, "developer_api"));
   if (gate) return gate;
-  const modelId = String(body.model ?? "resto-chat-fast");
+  const modelId = String(body.model ?? "freetokenai-chat-fast");
   const groqModel = MODEL_MAP[modelId] ?? null;
   if (!groqModel)
     return NextResponse.json(
       {
         error: {
           code: "INVALID_MODEL",
-          message: "Model tidak dikenal. Pakai: resto-chat-fast, resto-chat-pro.",
+          message: "Model tidak dikenal. Pakai: freetokenai-chat-fast, freetokenai-chat-pro.",
         },
       },
       { status: 400 },

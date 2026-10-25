@@ -100,3 +100,31 @@ body {
     animation: none;
   }
 }
+
+/* Cetak struk kasir (components/kasir/PrintReceipt.tsx): hanya .print-receipt
+   yang tampil, lebar kertas thermal 58mm. */
+@media print {
+  @page {
+    size: 58mm auto;
+    margin: 0;
+  }
+  body * {
+    visibility: hidden;
+  }
+  .print-receipt,
+  .print-receipt * {
+    visibility: visible;
+  }
+  .print-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 58mm;
+    max-width: none;
+    border: 0;
+    border-radius: 0;
+    padding: 2mm;
+    background: #fff;
+    color: #000;
+  }
+}

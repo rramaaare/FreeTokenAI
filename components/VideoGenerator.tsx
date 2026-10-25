@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Clock, Download, ImageIcon, Loader2, RotateCcw, Sparkles, Trash2, VideoIcon, X, Zap } from "lucide-react";
+import { ChevronDown, Clock, Download, ImageIcon, RotateCcw, Sparkles, Trash2, VideoIcon, X, Zap } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { loadMediaHistory, removeMediaAsset, type MediaSession } from "@/lib/media-history";
 import { useT, type Lang, type TKey } from "@/lib/i18n";
@@ -16,6 +16,7 @@ import {
 } from "@/lib/media-jobs";
 import ModelPicker from "./ModelPicker";
 import PillSelect from "./PillSelect";
+import MediaPendingTile from "./MediaPendingTile";
 
 type VideoMode = "t2v" | "i2v";
 
@@ -308,14 +309,7 @@ export default function VideoGenerator() {
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
             {pending.flatMap((p) =>
               Array.from({ length: p.count }).map((_, i) => (
-                <div
-                  key={`${p.key}-${i}`}
-                  className="flex aspect-video flex-col items-center justify-center gap-2 rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-center dark:border-neutral-800 dark:bg-neutral-900"
-                >
-                  <Loader2 size={20} className="animate-spin text-primary" />
-                  <p className="line-clamp-2 text-xs text-neutral-500 dark:text-neutral-400">{p.text}</p>
-                  <span className="text-[10px] text-neutral-400">{t("video.processing")}</span>
-                </div>
+                <MediaPendingTile key={`${p.key}-${i}`} kind="video" text={p.text} startedAt={p.startedAt} />
               ))
             )}
             {feed.map((item, i) => (

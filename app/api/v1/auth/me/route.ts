@@ -8,7 +8,7 @@ export async function GET(req: Request) {
   }
 
   return NextResponse.json(
-    { error: { code: "UNAUTHORIZED", message: "Belum login. Silakan masukkan API Key dari kasir." } },
+    { error: { code: "UNAUTHORIZED", message: "Belum login. Klaim kode struk dari kasir di halaman /claim." } },
     { status: 401 },
   );
 }

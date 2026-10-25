@@ -6,7 +6,7 @@ import { saveMediaSession } from "./media-history";
 import { notifyWorkspaceChanged } from "./settings";
 import { notifyTokensExhausted } from "./token-events";
 
-export type MediaJobState = { key: string; kind: "image" | "video"; text: string; count: number };
+export type MediaJobState = { key: string; kind: "image" | "video"; text: string; count: number; startedAt: number };
 
 export const MEDIA_JOBS_CHANGED = "ftai:media-jobs-changed";
 export const MEDIA_HISTORY_CHANGED = "ftai:media-history-changed";
@@ -44,7 +44,9 @@ async function pollGeneration(id: number): Promise<string> {
   let n = 0;
   while (Date.now() - t0 < 10 * 60 * 1000) {
     // ponytail: interval rekomendasi docs — 1s x10, lalu 5s, lalu 10s. Disederhanakan: 2s lalu 5s flat.
-    await new Promise((r) => setTimeout(r, n < 2 ? 2000 : 5000));
+    // Vio butuh ±70–90 dtk per job (diukur Okt 2026): cek tiap 3 dtk supaya hasil
+    // tampil maks 3 dtk setelah selesai (dulu 5 dtk), request tetap ringan.
+    await new Promise((r) => setTimeout(r, n < 2 ? 2000 : 3000));
     n++;
     const res = await fetch(`/api/generations/${id}`);
     const data = await res.json();
@@ -70,7 +72,7 @@ export function startMediaJob(args: {
 }): string {
   const key = crypto.randomUUID();
   const slots = args.kind === "image" ? args.count : 1;
-  jobs = [...jobs, { key, kind: args.kind, text: args.sent, count: slots }];
+  jobs = [...jobs, { key, kind: args.kind, text: args.sent, count: slots, startedAt: Date.now() }];
   lastError = "";
   emit(MEDIA_JOBS_CHANGED);
 

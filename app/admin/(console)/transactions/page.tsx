@@ -134,7 +134,7 @@ export default function AdminTransactionsPage() {
 
       {error && <Alert onClose={() => setError('')}>{error}</Alert>}
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatCard label="Transaksi" value={n(filtered.length)} hint={`${days} hari terakhir`} tone="neutral" />
         <StatCard label="Token Masuk" value={`+${n(masuk)}`} icon={<ArrowDownLeft size={16} />} tone="success" hint="Top-up & koreksi positif admin" />
         <StatCard label="Token Keluar" value={n(keluar)} icon={<ArrowUpRight size={16} />} tone="warning" hint="Reserve struk & API key" />

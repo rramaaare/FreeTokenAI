@@ -20,6 +20,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CHAT_CHANGED, CHAT_NEW, deleteChatSession, hydrateSessions, listChatSessions, type ChatSession } from "@/lib/chat-history";
 import { CHAT_JOBS_CHANGED } from "@/lib/chat-jobs";
+import { CURRENT_USER_CHANGED, isUserResolved } from "@/lib/current-user";
 import { useT, type TKey } from "@/lib/i18n";
 import { DEFAULT_PROFILE, fetchProfile, getProfile, SETTINGS_CHANGED, type UserProfile } from "@/lib/settings";
 
@@ -44,17 +45,24 @@ export default function Sidebar({ open, onClose }: { open?: boolean; onClose?: (
       setSessions(listChatSessions());
       setProfile(getProfile());
     };
-    sync();
-    void hydrateSessions();
-    fetchProfile().then(setProfile);
+    // ponytail: muat riwayat HANYA setelah akun terverifikasi (lihat lib/current-user):
+    // sebelum itu key lokal masih milik akun sebelumnya di perangkat ini.
+    const onUser = () => {
+      sync();
+      void hydrateSessions();
+      fetchProfile().then(setProfile);
+    };
+    if (isUserResolved()) onUser();
     window.addEventListener(CHAT_CHANGED, sync);
     window.addEventListener(CHAT_JOBS_CHANGED, () => void hydrateSessions());
     window.addEventListener(SETTINGS_CHANGED, sync);
     window.addEventListener("storage", sync);
+    window.addEventListener(CURRENT_USER_CHANGED, onUser);
     return () => {
       window.removeEventListener(CHAT_CHANGED, sync);
       window.removeEventListener(SETTINGS_CHANGED, sync);
       window.removeEventListener("storage", sync);
+      window.removeEventListener(CURRENT_USER_CHANGED, onUser);
     };
   }, []);
 

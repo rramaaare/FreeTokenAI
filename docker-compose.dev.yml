@@ -5,13 +5,13 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: resto_ai_dev
+      POSTGRES_DB: freetokenai_dev
     ports:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d resto_ai_dev"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d freetokenai_dev"]
       interval: 5s
       timeout: 3s
       retries: 10

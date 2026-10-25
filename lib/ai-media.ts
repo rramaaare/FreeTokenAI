@@ -238,3 +238,36 @@ export async function mediaAssetSource(
   if (!row || row.status !== "completed" || !row.asset_url) return null;
   return { url: row.asset_url, key: await providerKey("gemini"), user_id: row.user_id };
 }
+
+// ponytail: kepemilikan job Vio. Id job Vio numerik & berurutan dan semua user
+// FreeTokenAI memakai SATU akun Vio, jadi tanpa catatan ini siapa pun bisa
+// menebak id lalu mengambil hasil milik user lain. Dicatat di media_generations
+// (provider='vio', operation=id Vio) saat POST generate diterima.
+export function vioGenerationIds(data: unknown): string[] {
+  const d = (data ?? {}) as { generation_ids?: unknown; generation_id?: unknown };
+  const ids = Array.isArray(d.generation_ids) ? d.generation_ids : d.generation_id != null ? [d.generation_id] : [];
+  return ids.map((x) => String(x)).filter((x) => /^\d+$/.test(x));
+}
+
+export async function recordVioJobs(
+  userId: string | null,
+  kind: "image" | "video",
+  model: string,
+  prompt: string,
+  data: unknown,
+): Promise<void> {
+  for (const id of vioGenerationIds(data)) {
+    await sql`
+      INSERT INTO media_generations (user_id, provider, model_id, operation, status, prompt)
+      VALUES (${userId}, 'vio', ${model.slice(0, 120)}, ${`${kind}:${id}`}, 'processing', ${prompt})`;
+  }
+}
+
+/** Pemilik job Vio: undefined = job tak tercatat (bukan dari app ini / milik siapa pun). */
+export async function vioJobOwner(id: string): Promise<{ user_id: string | null } | undefined> {
+  const rows = (await sql`
+    SELECT user_id FROM media_generations
+    WHERE provider = 'vio' AND operation IN (${`image:${id}`}, ${`video:${id}`})
+    ORDER BY created_at DESC LIMIT 1`) as unknown as { user_id: string | null }[];
+  return rows[0];
+}

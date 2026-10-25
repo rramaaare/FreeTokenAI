@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { generateImages } from "@/lib/ai-media";
+import { generateImages, recordVioJobs } from "@/lib/ai-media";
+import { requireAuth } from "@/lib/auth";
 import { resolveRoute } from "@/lib/ai-router";
 import { mapAspect, vioFetch } from "@/lib/vio";
 import { evaluateAiRequest, gatekeeperAccessResponse, gatekeeperBlockResponse } from "@/lib/gatekeeper";
@@ -37,6 +38,7 @@ export async function POST(req: Request) {
     const finalCount = Math.min(2, Math.max(1, Number(count) || 1));
     const aspect = mapAspect("image", aspect_ratio ?? "1:1");
     const finalPrompt = String(prompt).slice(0, 5000);
+    const userId = (await requireAuth(req))?.user.id ?? null;
 
     const run = async () => {
       if (route.family === "vio") {
@@ -44,6 +46,7 @@ export async function POST(req: Request) {
           method: "POST",
           body: JSON.stringify({ prompt: finalPrompt, model: finalModel, aspect_ratio: aspect, count: finalCount }),
         });
+        if (status < 300) await recordVioJobs(userId, "image", finalModel, finalPrompt, data);
         return NextResponse.json(data, { status });
       }
       const out = await generateImages(route, { prompt: finalPrompt, aspect, count: finalCount });

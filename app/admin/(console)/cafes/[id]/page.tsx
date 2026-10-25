@@ -22,6 +22,7 @@ import {
   PageHeader,
   StatCard,
   cardCls,
+  inputCls,
 } from '@/components/admin/ui';
 
 type Workspace = { id: string; name: string; token_balance: number; expires_at: string | null };
@@ -44,6 +45,8 @@ type CafeDetail = {
     name: string;
     is_active: boolean;
     token_balance: number;
+    retail_rupiah_per_token: number;
+    bonus_rupiah_per_token: number;
     total_topup: number;
     total_used: number;
     last_activity_at: string | null;
@@ -70,6 +73,78 @@ const TABS = [
   { id: 'ledger', label: 'Riwayat Saldo' },
   { id: 'workspace', label: 'Workspace' },
 ] as const;
+
+function PricingCard({
+  cafeId,
+  retail,
+  bonus,
+  onSaved,
+  onError,
+}: {
+  cafeId: string;
+  retail: number;
+  bonus: number;
+  onSaved: (msg: string) => void;
+  onError: (msg: string) => void;
+}) {
+  const [retailIn, setRetailIn] = useState(String(retail));
+  const [bonusIn, setBonusIn] = useState(String(bonus));
+  const [busy, setBusy] = useState(false);
+  const r = Number(retailIn);
+  const b = Number(bonusIn);
+  const valid = Number.isInteger(r) && r >= 1 && Number.isInteger(b) && b >= 1;
+  const dirty = r !== retail || b !== bonus;
+
+  async function save() {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/v1/admin/cafes/${cafeId}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ retail_rupiah_per_token: r, bonus_rupiah_per_token: b }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error?.message ?? `HTTP ${res.status}`);
+      onSaved('Tarif billing kasir tersimpan.');
+    } catch (e) {
+      onError(e instanceof Error ? e.message : 'Gagal menyimpan tarif');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className={cardCls}>
+      <div className="flex items-center gap-2 border-b border-neutral-100 px-5 py-4 dark:border-neutral-700">
+        <CreditCard size={16} className="text-primary" />
+        <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Tarif Billing Kasir</h2>
+      </div>
+      <div className="grid gap-4 p-5 sm:grid-cols-2">
+        <label className="block">
+          <span className="text-xs font-medium text-neutral-600 dark:text-neutral-300">Harga token ketengan (Rp per token)</span>
+          <input type="number" min={1} inputMode="numeric" value={retailIn} onChange={(e) => setRetailIn(e.target.value)} className={`${inputCls} mt-1`} />
+          {valid && <span className="mt-1 block text-[11px] text-neutral-400">100 token = Rp{n(100 * r)}</span>}
+        </label>
+        <label className="block">
+          <span className="text-xs font-medium text-neutral-600 dark:text-neutral-300">Bonus belanja produk (tiap Rp … = 1 token)</span>
+          <input type="number" min={1} inputMode="numeric" value={bonusIn} onChange={(e) => setBonusIn(e.target.value)} className={`${inputCls} mt-1`} />
+          {valid && <span className="mt-1 block text-[11px] text-neutral-400">Belanja Rp50.000 = {n(Math.floor(50_000 / b))} token</span>}
+        </label>
+        <div className="sm:col-span-2">
+          <button
+            type="button"
+            onClick={save}
+            disabled={busy || !valid || !dirty}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy ? 'Menyimpan…' : 'Simpan Tarif'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function CafeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -161,6 +236,18 @@ export default function CafeDetailPage({ params }: { params: Promise<{ id: strin
         <StatCard label="Total Terpakai" value={n(cafe.total_used)} hint="akumulasi keluar" icon={<ArrowUpRight size={16} />} tone="warning" />
         <StatCard label="Aktif Sampai" value={d(cafe.expires_at)} hint={`${workspaces.length} workspace`} icon={<Calendar size={16} />} tone="neutral" />
       </div>
+
+      <PricingCard
+        key={`${cafe.retail_rupiah_per_token}-${cafe.bonus_rupiah_per_token}`}
+        cafeId={cafe.id}
+        retail={cafe.retail_rupiah_per_token}
+        bonus={cafe.bonus_rupiah_per_token}
+        onSaved={(msg) => {
+          setNotice(msg);
+          void loadData();
+        }}
+        onError={setError}
+      />
 
       <div className="flex gap-1 overflow-x-auto rounded-xl border border-neutral-200 bg-white p-1 dark:border-neutral-700 dark:bg-neutral-800">
         {TABS.map((t) => (

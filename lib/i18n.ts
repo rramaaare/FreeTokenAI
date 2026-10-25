@@ -40,17 +40,9 @@ const id = {
   // auth modal
   "auth.welcome": "Selamat Datang di FreeTokenAI",
   "auth.desc":
-    "Untuk memakai AI, dapatkan API Key dari kasir cafe.",
-  "auth.yourKey": "API Key Anda",
-  "auth.validate": "Validasi & Masuk ke Dashboard",
-  "auth.validating": "Memvalidasi Kunci...",
+    "Untuk memakai AI, beli struk token di kasir cafe lalu klaim kodenya.",
   "auth.needKey":
-    "Belum punya kunci? Pesan di kasir cafe untuk mendapatkan struk API Key.",
-  "auth.staff": "Pegawai cafe?",
-  "auth.staffLogin": "Login Kasir POS",
-  "auth.empty": "Masukkan API key terlebih dahulu.",
-  "auth.failed": "Validasi API key gagal.",
-  "auth.error": "Terjadi kesalahan.",
+    "Sudah punya struk? Masukkan kode struk dan No. WA/email Anda di halaman klaim.",
 
   // token habis
   "tokens.title": "Saldo Token Habis",
@@ -126,7 +118,7 @@ const id = {
   "settings.about.title": "Tentang",
   "settings.about.desc": "Versi & aturan main Token.",
   "settings.about.text":
-    "RestoAI v1.5 — Workspace berlaku 7 hari, dan Token otomatis diperpanjang 7 hari setiap transaksi berbayar selama saldo masih ada. Butuh bantuan? Hubungi kasir restoran.",
+    "FreeTokenAI v1.5 — Workspace berlaku 7 hari, dan Token otomatis diperpanjang 7 hari setiap transaksi berbayar selama saldo masih ada. Butuh bantuan? Hubungi kasir restoran.",
 
   // chat
   "chat.activeUntil": "Aktif Sampai {date}",
@@ -157,7 +149,7 @@ const id = {
   "input.uploadFile": "Upload File",
   "input.uploadDesc": "Dokumen, PDF, atau file lainnya",
   "input.placeholder": "Ketik apa saja — pertanyaan, tugas, atau ide mentah...",
-  "input.disclaimer": "RestoAI bisa keliru. Periksa info penting.",
+  "input.disclaimer": "FreeTokenAI bisa keliru. Periksa info penting.",
   "input.terms": "Ketentuan Token",
   "input.addAttachment": "Tambah lampiran",
   "input.closeMenu": "Tutup menu lampiran",
@@ -237,6 +229,9 @@ const id = {
   "video.emptyDesc":
     "Pilih mode, tulis prompt/unggah gambar, lalu tekan Buat — atau klik contoh di bawah.",
   "video.processing": "Memproses...",
+  "media.waiting": "Sedang dibuat · {time}",
+  "media.waitHint": "Biasanya selesai ±1–2 menit",
+  "media.waitSlow": "Antrean provider sedang ramai, tetap diproses…",
   "video.download": "Unduh",
   "video.downloadMp4": "Unduh MP4",
   "video.settings": "Pengaturan",
@@ -299,11 +294,11 @@ const id = {
   "dev.usagePost": ". Limit 60 req/menit/key (PRD 5.2).",
   "dev.modelsTitle": "Model gratis yang disarankan",
   "dev.free1.use": "Chat cepat / AI agent default",
-  "dev.free1.id": "resto-chat-fast → openai/gpt-oss-20b",
+  "dev.free1.id": "freetokenai-chat-fast → openai/gpt-oss-20b",
   "dev.free1.why":
     "Gratis di free-tier Groq, limit murah hati, terbukti 200 di repo ini. 1 Token / 1K token-LLM (PRD 6).",
   "dev.free2.use": "Chat reasoning / analisis kompleks",
-  "dev.free2.id": "resto-chat-pro → openai/gpt-oss-120b",
+  "dev.free2.id": "freetokenai-chat-pro → openai/gpt-oss-120b",
   "dev.free2.why":
     "Gratis juga di Groq, lebih pintar tapi lebih lambat. 10 Token / 1K token-LLM (PRD 6).",
   "dev.free3.use": "Fallback kalau Groq down",
@@ -314,32 +309,6 @@ const id = {
   "dev.free4.id": "nano-banana-2 / veo-3.1-lite (Vio, berbayar)",
   "dev.free4.why":
     "Vio TIDAK punya tier gratis — tiap request motong kredit. Paling murah: gambar 3 kredit, video veo-3.1-lite 5 kredit. Alternatif benar-benar gratis: Pollinations.ai (gambar saja, kualitas kurang).",
-
-  // user dashboard
-  "user.checking": "Memeriksa sesi pengguna...",
-  "user.enterKey": "Masukkan API Key",
-  "user.enterKeyDesc":
-    "Dapatkan API Key dari kasir cafe untuk mulai menggunakan layanan AI Workspace.",
-  "user.cafeKey": "API Key Kafe",
-  "user.validating": "Memvalidasi...",
-  "user.validateOpen": "Validasi & Buka Dashboard",
-  "user.keyReceipt":
-    "API key tercetak pada struk belanja Anda dengan format rst_live_...",
-  "user.activeSession": "Sesi Aktif",
-  "user.dashboard": "User Dashboard",
-  "user.subtitle": "Kelola token dan akses layanan AI kafe",
-  "user.changeKey": "Ganti Key",
-  "user.balanceTitle": "Saldo Token Anda",
-  "user.remaining": "Sisa Kuota Token",
-  "user.ready": "Siap digunakan untuk chat AI",
-  "user.validity": "Masa Berlaku",
-  "user.unlimited": "Tidak terbatas",
-  "user.afterDate": "Setelah tanggal ini, token tidak dapat digunakan.",
-  "user.workspaceReady": "Workspace AI Siap",
-  "user.startChat": "Mulai Percakapan AI",
-  "user.startChatDesc":
-    "Tanyakan apa saja, buat konten, analisis data, atau diskusikan ide bisnis langsung dari meja kafe Anda.",
-  "user.openChat": "Buka Chat AI Sekarang",
 
   // claim page
   "claim.successTitle": "Token berhasil diklaim",
@@ -391,17 +360,9 @@ const en: Record<keyof typeof id, string> = {
 
   "auth.welcome": "Welcome to FreeTokenAI",
   "auth.desc":
-    "To use AI, get an API Key from the cafe cashier.",
-  "auth.yourKey": "Your API Key",
-  "auth.validate": "Validate & Enter Dashboard",
-  "auth.validating": "Validating key...",
+    "To use AI, buy a token receipt at the cafe cashier and claim its code.",
   "auth.needKey":
-    "No key yet? Order at the cafe cashier to get an API Key receipt.",
-  "auth.staff": "Cafe staff?",
-  "auth.staffLogin": "Cashier POS Login",
-  "auth.empty": "Enter an API key first.",
-  "auth.failed": "API key validation failed.",
-  "auth.error": "Something went wrong.",
+    "Have a receipt? Enter its code and your WhatsApp/email on the claim page.",
 
   "tokens.title": "Token Balance Empty",
   "tokens.desc": "Choose one of the options below to keep using AI.",
@@ -475,7 +436,7 @@ const en: Record<keyof typeof id, string> = {
   "settings.about.title": "About",
   "settings.about.desc": "Version & token rules.",
   "settings.about.text":
-    "RestoAI v1.5 — Workspaces last 7 days, and Tokens auto-extend by 7 days on every paid transaction while your balance is positive. Need help? Contact the restaurant cashier.",
+    "FreeTokenAI v1.5 — Workspaces last 7 days, and Tokens auto-extend by 7 days on every paid transaction while your balance is positive. Need help? Contact the restaurant cashier.",
 
   "chat.activeUntil": "Active until {date}",
   "chat.headline": "Where would you like to start today?",
@@ -503,7 +464,7 @@ const en: Record<keyof typeof id, string> = {
   "input.uploadFile": "Upload File",
   "input.uploadDesc": "Documents, PDFs, or other files",
   "input.placeholder": "Type anything — a question, task, or raw idea...",
-  "input.disclaimer": "RestoAI can make mistakes. Check important info.",
+  "input.disclaimer": "FreeTokenAI can make mistakes. Check important info.",
   "input.terms": "Token Terms",
   "input.addAttachment": "Add attachment",
   "input.closeMenu": "Close attachment menu",
@@ -579,6 +540,9 @@ const en: Record<keyof typeof id, string> = {
   "video.emptyDesc":
     "Choose a mode, write a prompt/upload an image, then press Create — or click an example below.",
   "video.processing": "Processing...",
+  "media.waiting": "Generating · {time}",
+  "media.waitHint": "Usually ready in ~1–2 minutes",
+  "media.waitSlow": "Provider queue is busy, still processing…",
   "video.download": "Download",
   "video.downloadMp4": "Download MP4",
   "video.settings": "Settings",
@@ -640,11 +604,11 @@ const en: Record<keyof typeof id, string> = {
   "dev.usagePost": ". Limit 60 req/min/key (PRD 5.2).",
   "dev.modelsTitle": "Recommended free models",
   "dev.free1.use": "Fast chat / default AI agent",
-  "dev.free1.id": "resto-chat-fast → openai/gpt-oss-20b",
+  "dev.free1.id": "freetokenai-chat-fast → openai/gpt-oss-20b",
   "dev.free1.why":
     "Free on Groq's free tier, generous limits, verified 200 in this repo. 1 Token / 1K LLM tokens (PRD 6).",
   "dev.free2.use": "Reasoning chat / complex analysis",
-  "dev.free2.id": "resto-chat-pro → openai/gpt-oss-120b",
+  "dev.free2.id": "freetokenai-chat-pro → openai/gpt-oss-120b",
   "dev.free2.why":
     "Also free on Groq, smarter but slower. 10 Tokens / 1K LLM tokens (PRD 6).",
   "dev.free3.use": "Fallback if Groq is down",
@@ -655,31 +619,6 @@ const en: Record<keyof typeof id, string> = {
   "dev.free4.id": "nano-banana-2 / veo-3.1-lite (Vio, paid)",
   "dev.free4.why":
     "Vio has NO free tier — every request consumes credits. Cheapest: 3 credits for images, 5 credits for veo-3.1-lite video. Truly free alternative: Pollinations.ai (images only, lower quality).",
-
-  "user.checking": "Checking your session...",
-  "user.enterKey": "Enter API Key",
-  "user.enterKeyDesc":
-    "Get an API Key from the cafe cashier to start using the AI Workspace.",
-  "user.cafeKey": "Cafe API Key",
-  "user.validating": "Validating...",
-  "user.validateOpen": "Validate & Open Dashboard",
-  "user.keyReceipt":
-    "The API key is printed on your receipt in the format rst_live_...",
-  "user.activeSession": "Active Session",
-  "user.dashboard": "User Dashboard",
-  "user.subtitle": "Manage your tokens and cafe AI access",
-  "user.changeKey": "Change Key",
-  "user.balanceTitle": "Your Token Balance",
-  "user.remaining": "Remaining Token Quota",
-  "user.ready": "Ready for AI chat",
-  "user.validity": "Valid Until",
-  "user.unlimited": "Unlimited",
-  "user.afterDate": "After this date, tokens can no longer be used.",
-  "user.workspaceReady": "AI Workspace Ready",
-  "user.startChat": "Start an AI Conversation",
-  "user.startChatDesc":
-    "Ask anything, create content, analyze data, or discuss business ideas right from your cafe table.",
-  "user.openChat": "Open AI Chat Now",
 
   "claim.successTitle": "Tokens claimed successfully",
   "claim.successDesc":

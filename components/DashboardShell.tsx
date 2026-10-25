@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Sparkles } from "lucide-react";
+import Link from "next/link";
+import { ReceiptText, Sparkles } from "lucide-react";
 import Sidebar from "./Sidebar";
 import TopBar from "./TopBar";
 import TokenExhaustedModal from "./TokenExhaustedModal";
+import { bindCurrentUser } from "@/lib/current-user";
 import { notifySettingsChanged, notifyWorkspaceChanged } from "@/lib/settings";
 import { TOKENS_EXHAUSTED_EVENT } from "@/lib/token-events";
 import { useT } from "@/lib/i18n";
@@ -20,11 +22,15 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     try {
       const res = await fetch("/api/v1/auth/me", { credentials: "include", cache: "no-store" });
       if (res.ok) {
+        const data = (await res.json().catch(() => null)) as { user?: { id?: string } } | null;
+        bindCurrentUser(data?.user?.id ?? null);
         setIsAuthenticated(true);
       } else {
+        bindCurrentUser(null);
         setIsAuthenticated(false);
       }
     } catch {
+      bindCurrentUser(null);
       setIsAuthenticated(false);
     } finally {
       setReady(true);
@@ -35,6 +41,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     checkAuth();
 
     const handleLogout = () => {
+      bindCurrentUser(null);
       setIsAuthenticated(false);
       setTokensExhausted(false);
     };
@@ -72,7 +79,9 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       <Sidebar open={open} onClose={close} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar onMenu={() => setOpen(true)} />
-        <main className="flex min-h-0 flex-1 overflow-hidden">{children}</main>
+        {/* Konten (riwayat gambar/video/chat) baru dirender setelah akun terverifikasi
+            & riwayat lokal terikat ke akun itu — tak ada sisa milik akun lain yang sempat tampil. */}
+        <main className="flex min-h-0 flex-1 overflow-hidden">{ready && isAuthenticated ? children : null}</main>
       </div>
 
       {/* ponytail: shell dirender duluan; modal tunggu cek auth supaya tak nge-flash */}
@@ -114,6 +123,13 @@ function ApiKeyPromptModal({ onSuccess }: { onSuccess: () => void }) {
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
             {t("auth.needKey")}
           </p>
+          <Link
+            href="/claim"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/25 transition hover:bg-primary-hover"
+          >
+            <ReceiptText size={16} />
+            {t("claim.submit")}
+          </Link>
         </div>
       </div>
     </div>

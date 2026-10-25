@@ -66,11 +66,13 @@ export default function DeveloperApi() {
   const curl = `curl -X POST ${origin}/api/v1/chat/completions \\
   -H "Authorization: Bearer ${activeKey}" \\
   -H "Content-Type: application/json" \\
-  -d '{"model": "resto-chat-fast", "messages": [{"role": "user", "content": "Halo!"}]}'`;
+  -d '{"model": "freetokenai-chat-fast", "messages": [{"role": "user", "content": "Halo!"}]}'`;
 
   return (
-    <div className="h-full flex-1 overflow-y-auto">
-      <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+    // min-w-0: anak flex default min-width:auto — tanpa ini baris curl panjang
+    // melebarkan seluruh halaman melewati layar HP.
+    <div className="h-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
+      <div className="mx-auto flex w-full min-w-0 max-w-3xl flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
         <div>
           <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">{t("dev.title")}</h1>
           <p className="mt-1 text-sm text-neutral-500">
@@ -79,7 +81,7 @@ export default function DeveloperApi() {
         </div>
 
         {/* Generate */}
-        <section className="rounded-2xl border border-neutral-200 p-5 dark:border-neutral-800">
+        <section className="min-w-0 rounded-2xl border border-neutral-200 p-4 dark:border-neutral-800 sm:p-5">
           <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">{t("dev.keyTitle")}</h2>
           <div className="mt-3 flex flex-col gap-2 sm:flex-row">
             <input
@@ -103,8 +105,8 @@ export default function DeveloperApi() {
               <p className="font-medium text-amber-800 dark:text-amber-200">
                 {t("dev.copyNow")}
               </p>
-              <div className="mt-2 flex items-center gap-2">
-                <code className="min-w-0 flex-1 break-all rounded-lg bg-white px-2 py-1 font-mono text-xs dark:bg-neutral-900">
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <code className="min-w-0 basis-full break-all sm:basis-0 sm:flex-1 rounded-lg bg-white px-2 py-1 font-mono text-xs dark:bg-neutral-900">
                   {reveal ? justCreated : "•".repeat(28)}
                 </code>
                 <button
@@ -173,18 +175,18 @@ export default function DeveloperApi() {
         </section>
 
         {/* Cara pakai */}
-        <section className="rounded-2xl border border-neutral-200 p-5 dark:border-neutral-800">
+        <section className="min-w-0 rounded-2xl border border-neutral-200 p-4 dark:border-neutral-800 sm:p-5">
           <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">{t("dev.usageTitle")}</h2>
           <p className="mt-1 text-[13px] text-neutral-500">
-            {t("dev.usagePre")}<code className="font-mono">/api/v1/chat/completions</code>{t("dev.usagePost")}
+            {t("dev.usagePre")}<code className="break-all font-mono">/api/v1/chat/completions</code>{t("dev.usagePost")}
           </p>
-          <pre className="mt-3 overflow-x-auto rounded-xl bg-neutral-950 p-3 font-mono text-xs text-neutral-100">
+          <pre className="mt-3 max-w-full overflow-x-auto rounded-xl bg-neutral-950 p-3 font-mono text-[11px] leading-relaxed text-neutral-100 sm:text-xs">
             {curl}
           </pre>
         </section>
 
         {/* Model gratis */}
-        <section className="rounded-2xl border border-neutral-200 p-5 dark:border-neutral-800">
+        <section className="min-w-0 rounded-2xl border border-neutral-200 p-4 dark:border-neutral-800 sm:p-5">
           <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">
             {t("dev.modelsTitle")}
           </h2>
@@ -192,7 +194,7 @@ export default function DeveloperApi() {
             {FREE_MODELS.map((m) => (
               <li key={m.id} className="text-[13px]">
                 <p className="font-medium text-neutral-900 dark:text-white">{t(m.use)}</p>
-                <code className="font-mono text-xs text-primary">{t(m.id)}</code>
+                <code className="break-all font-mono text-xs text-primary">{t(m.id)}</code>
                 <p className="mt-0.5 text-neutral-500">{t(m.why)}</p>
               </li>
             ))}

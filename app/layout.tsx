@@ -10,7 +10,7 @@ const dmSans = DM_Sans({
 
 export const metadata: Metadata = {
   title: "FreeTokenAI",
-  description: "Dashboard Token AI pelanggan RestoAI (Chat, Image, Video, Developer API).",
+  description: "Dashboard Token AI pelanggan FreeTokenAI (Chat, Image, Video, Developer API).",
 };
 
 export default function RootLayout({

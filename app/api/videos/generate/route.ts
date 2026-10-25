@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
-import { startGeminiVideo } from "@/lib/ai-media";
+import { recordVioJobs, startGeminiVideo } from "@/lib/ai-media";
 import { resolveRoute } from "@/lib/ai-router";
 import { mapAspect, vioFetch, vioUploadAsset } from "@/lib/vio";
 import { evaluateAiRequest, gatekeeperAccessResponse, gatekeeperBlockResponse } from "@/lib/gatekeeper";
@@ -101,6 +101,7 @@ export async function POST(req: Request) {
           method: "POST",
           body: JSON.stringify(vioBody),
         });
+        if (status < 300) await recordVioJobs(userId, "video", finalModel, finalPrompt, data);
         return NextResponse.json(data, { status });
       }
       if (route.family !== "gemini")

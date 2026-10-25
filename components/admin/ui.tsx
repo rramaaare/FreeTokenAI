@@ -33,18 +33,18 @@ export function PageHeader({
 }) {
   return (
     <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3">
         {icon && (
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800">
             {icon}
           </span>
         )}
-        <div>
+        <div className="min-w-0">
           <h1 className="text-xl font-bold text-neutral-900 dark:text-white">{title}</h1>
           {description && <p className="mt-0.5 text-sm text-neutral-500 dark:text-neutral-400">{description}</p>}
         </div>
       </div>
-      {action && <div className="flex shrink-0 items-center gap-2">{action}</div>}
+      {action && <div className="flex shrink-0 flex-wrap items-center gap-2">{action}</div>}
     </header>
   );
 }
@@ -107,12 +107,12 @@ export function StatCard({
   tone?: Tone;
 }) {
   return (
-    <div className={`${cardCls} p-5`}>
+    <div className={`${cardCls} min-w-0 p-4 sm:p-5`}>
       <div className="flex items-start justify-between gap-3">
         <p className={`text-[11px] font-semibold uppercase leading-4 tracking-wide ${LABEL_TONE[tone]}`}>{label}</p>
         {icon && <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${TONE[tone]}`}>{icon}</span>}
       </div>
-      <p className="mt-2 text-2xl font-bold tabular-nums text-neutral-900 dark:text-white">{value}</p>
+      <p className="mt-2 break-words text-xl font-bold tabular-nums text-neutral-900 dark:text-white sm:text-2xl">{value}</p>
       {hint && <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">{hint}</p>}
     </div>
   );

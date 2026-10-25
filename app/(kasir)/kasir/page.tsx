@@ -1,15 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, KeyRound, ReceiptText, Search } from "lucide-react";
+import { ArrowUpRight, ReceiptText, Search } from "lucide-react";
 import { WelcomeBanner } from "@/components/admin/ui";
 import KasirDashboard from "@/components/kasir/KasirDashboard";
 import { useKasir } from "@/components/kasir/KasirShell";
 
 const QUICK_LINKS = [
   { href: "/kasir/struk", label: "Buat Struk", description: "Cetak kode klaim token", icon: ReceiptText },
-  { href: "/kasir/keys", label: "API Key Saya", description: "Terbitkan & pantau key", icon: KeyRound },
-  { href: "/kasir/status", label: "Cek Status Key", description: "Lihat sisa kuota pelanggan", icon: Search },
+  { href: "/kasir/status", label: "Cek Status Struk", description: "Status klaim & saldo pelanggan", icon: Search },
 ];
 
 export default function KasirHomePage() {
@@ -19,10 +18,10 @@ export default function KasirHomePage() {
     <div className="space-y-6">
       <WelcomeBanner
         name={user.name || "Kasir"}
-        description="Buat struk token, terbitkan API key pelanggan, dan pantau saldo cafe Anda."
+        description="Buat struk token dan pantau saldo cafe Anda."
       />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {QUICK_LINKS.map((item) => (
           <Link
             key={item.href}

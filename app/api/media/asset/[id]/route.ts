@@ -12,7 +12,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const source = await mediaAssetSource(id);
   if (!source)
     return NextResponse.json({ error: { code: "NOT_FOUND", message: "Aset tidak ditemukan." } }, { status: 404 });
-  if (source.user_id && source.user_id !== auth.user.id)
+  // Aset tanpa pemilik (user_id NULL) juga ditolak: jangan jadi celah lintas user.
+  if (source.user_id !== auth.user.id)
     return NextResponse.json({ error: { code: "FORBIDDEN", message: "Bukan asetmu." } }, { status: 403 });
 
   try {

@@ -1,4 +1,4 @@
-# Resto AI — Web
+# FreeTokenAI — Web
 
 Aplikasi web SaaS untuk restoran/kafe: pelanggan membeli **struk** di kasir, mengklaim **QR struk** menjadi **Token**, lalu memakai Token untuk chat, generate gambar, dan generate video AI. Kasir menerbitkan struk (memotong kuota prepaid kafe), super admin memantau kafe dan pemakaian API. Tersedia juga **API gateway** yang kompatibel dengan format OpenAI chat completions untuk integrasi POS.
 
@@ -147,7 +147,7 @@ npm run db:seed
 
 | Variable | Wajib | Keterangan |
 |----------|-------|------------|
-| `DATABASE_URL` | ya | `postgres://postgres:postgres@localhost:5433/resto_ai_dev` |
+| `DATABASE_URL` | ya | `postgres://postgres:postgres@localhost:5433/freetokenai_dev` |
 | `REDIS_URL` | ya | `redis://localhost:6380` |
 | `VIO_API_KEY` | untuk image/video | API key VIO |
 | `GEMINI_API_KEY` | untuk chat/image | API key Google Gemini |
@@ -225,10 +225,16 @@ Setiap request AI memotong Token dari workspace yang sedang login. Di developmen
 
 1. Buka `/kasir`, login dengan akun kasir (lihat tabel akun).
 2. Token disimpan di `localStorage` (kunci sama dengan `/admin`).
-3. Pilih paket Token → **Generate Struk**.
-4. Sistem memanggil `POST /api/v1/admin/receipts/generate`; respons berisi `code`, `claim_url`, `tokens`.
-5. QR struk tampil; tombol **Cetak** memakai CSS print 80mm.
-6. QR statis kafe: `GET /api/v1/admin/cafes/:id/static-qr.png` (Bearer kasir kafe tersebut).
+3. **Buat Struk**, pilih salah satu:
+   - **Beli Produk**: isi total belanja → token bonus = `floor(total / bonus_rupiah_per_token)`.
+   - **Beli Token Ketengan**: isi jumlah token (harga = `token × retail_rupiah_per_token`) atau pilih paket hemat.
+4. Sistem memanggil `POST /api/v1/admin/receipts/generate`; respons berisi `code`, `claim_url`, `tokens`, `rupiah_amount`.
+5. Struk siap cetak tampil (kop kafe, rincian, QR, kode); tombol **Cetak Struk** memakai CSS print thermal **58mm**.
+6. **Cek Status Struk**: daftar struk + filter klaim, detail pengklaim & sisa saldo, cetak ulang struk yang belum diklaim.
+7. Top-up pelanggan = buat struk baru; diklaim dengan No. WA/email yang sama → masuk saldo yang sama.
+8. QR statis kafe: `GET /api/v1/admin/cafes/:id/static-qr.png` (Bearer kasir kafe tersebut).
+
+Tarif `retail_rupiah_per_token` (default Rp10) dan `bonus_rupiah_per_token` (default Rp100) diatur super admin per kafe di `/admin/cafes/:id`.
 
 Struk idempoten: `pos_reference_id` yang sama tidak membuat struk baru dan tidak memotong kuota lagi.
 
@@ -250,10 +256,10 @@ Halaman `/admin/*` dijaga di server: tanpa cookie → redirect `/admin/login`; r
 curl -X POST http://localhost:3000/api/v1/chat/completions \
   -H "Authorization: Bearer rst_live_xxx" \
   -H "Content-Type: application/json" \
-  -d '{"model":"resto-chat-fast","messages":[{"role":"user","content":"Menu kopi?"}]}'
+  -d '{"model":"freetokenai-chat-fast","messages":[{"role":"user","content":"Menu kopi?"}]}'
 ```
 
-Model: `resto-chat-fast`, `resto-chat-pro`. Rate limit **60 request/menit per API key**.
+Model: `freetokenai-chat-fast`, `freetokenai-chat-pro`. Rate limit **60 request/menit per API key**.
 
 ### 5. Klaim struk (pelanggan)
 
@@ -272,31 +278,130 @@ Respons sukses men-set cookie `ftai_session` sehingga pelanggan langsung masuk d
 
 Halaman klaim untuk pelanggan: **`/claim?code=RST-XXXX`**. Form meminta No. WhatsApp/email, memanggil endpoint di atas, lalu menampilkan saldo token yang masuk. `claim_url` dari `POST /admin/receipts/generate` dan isi QR struk memakai `APP_BASE_URL` (atau origin request bila kosong) - tidak ada domain hardcode.
 
-### 6. Login admin via API (Bearer, lintas origin)
+### 6. Integrasi aplikasi kasir kafe (POS) → buat struk FreeTokenAI
+
+Aplikasi kasir milik kafe (POS, mesin kasir, aplikasi tablet) bisa membuat struk token langsung lewat API — tanpa membuka `/kasir`. Ganti `https://freetokenai.example.com` dengan domain FreeTokenAI Anda (lokal: `http://localhost:3000`).
+
+**Ringkasan alur**
+
+```
+POS login (akun kasir) ─► access_token
+   │
+   ├─ pelanggan bayar ─► POST /api/v1/admin/receipts/generate  { pos_reference_id = no. nota POS }
+   │                         └─ respons: code, claim_url, tokens, rupiah_amount
+   ├─ cetak struk: tampilkan code + QR (isi QR = claim_url)
+   └─ (opsional) cek status: GET /api/v1/admin/receipts/lookup?code=...
+```
+
+**1. Login akun kasir** — sekali di awal shift, simpan kedua token di POS.
 
 ```bash
-curl -X POST http://localhost:3000/api/v1/admin/auth/login \
-  -H "Origin: http://localhost:3000" \
+curl -X POST https://freetokenai.example.com/api/v1/admin/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"kasir.kopi@example.com","password":"Kasir123!"}'
 ```
 
-Respons: `access_token` (JWT HS256, 15 menit), `refresh_token` (7 hari, sekali pakai), `user`. Semua endpoint admin mewajibkan header `Origin` yang diizinkan.
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "refresh_token": "3f9c1e...",
+  "user": { "id": "…", "role": "kasir", "cafe_id": "…" }
+}
+```
+
+`access_token` berlaku 15 menit, `refresh_token` 7 hari dan **sekali pakai**. Struk selalu masuk ke kafe milik akun kasir tersebut (`cafe_id` tidak perlu dikirim).
+
+**2. (Opsional) Ambil tarif & paket** — untuk menampilkan harga di layar POS.
 
 ```bash
-# Generate struk
-curl -X POST http://localhost:3000/api/v1/admin/receipts/generate \
-  -H "Origin: http://localhost:3000" \
+# Tarif kafe: retail_rupiah_per_token & bonus_rupiah_per_token
+curl https://freetokenai.example.com/api/v1/kasir/pricing \
+  -H "Authorization: Bearer <access_token>"
+
+# Daftar paket token aktif (id dipakai di token_package_id)
+curl https://freetokenai.example.com/api/v1/admin/token-packages \
+  -H "Authorization: Bearer <access_token>"
+```
+
+**3. Buat struk** — pilih salah satu bentuk body. `pos_reference_id` = nomor nota POS (3–100 karakter, unik).
+
+```bash
+# a) Beli Produk: pelanggan belanja Rp50.000, dapat token bonus sesuai tarif kafe
+curl -X POST https://freetokenai.example.com/api/v1/admin/receipts/generate \
   -H "Authorization: Bearer <access_token>" \
   -H "Content-Type: application/json" \
-  -d '{"pos_reference_id":"POS-001","token_package_id":"<id-paket>"}'
+  -d '{"mode":"product","rupiah_amount":50000,"pos_reference_id":"NOTA-20261025-0001"}'
 
-# Refresh (rotasi; refresh token lama hangus)
-curl -X POST http://localhost:3000/api/v1/admin/auth/refresh \
-  -H "Origin: http://localhost:3000" \
+# b) Beli Token Ketengan: 500 token, harga dihitung server (500 x tarif ketengan)
+curl -X POST https://freetokenai.example.com/api/v1/admin/receipts/generate \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"mode":"retail","tokens":500,"pos_reference_id":"NOTA-20261025-0002"}'
+
+# c) Paket token
+curl -X POST https://freetokenai.example.com/api/v1/admin/receipts/generate \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"token_package_id":"<id-paket>","pos_reference_id":"NOTA-20261025-0003"}'
+```
+
+Respons (`201` struk baru, `200` bila `pos_reference_id` sudah pernah dipakai — struk lama dikembalikan, saldo tidak dipotong lagi):
+
+```json
+{
+  "code": "RST-482913",
+  "claim_url": "https://freetokenai.example.com/claim?code=RST-482913",
+  "tokens": 500,
+  "purchase_type": "product",
+  "rupiah_amount": 50000,
+  "created_at": "2026-10-25T08:12:44.120Z",
+  "pos_reference_id": "NOTA-20261025-0001",
+  "cafe_name": "Kopi Senja"
+}
+```
+
+Jumlah token dan harga **selalu dihitung server** dari tarif kafe; POS cukup kirim nominal belanja / jumlah token. Karena idempoten, aman mengirim ulang request yang timeout dengan `pos_reference_id` yang sama.
+
+**4. Cetak di struk POS** — cetak `code` dan QR berisi `claim_url`. Printer POS bisa membuat QR sendiri dari `claim_url`, atau unduh PNG siap pakai:
+
+```bash
+curl -o qr.png https://freetokenai.example.com/api/v1/receipts/RST-482913/qr.png
+```
+
+Pelanggan scan QR → `/claim` (kode terisi otomatis) → masukkan No. WA/email → token masuk.
+
+**5. (Opsional) Cek status struk**
+
+```bash
+# Satu struk: status klaim, pengklaim (disamarkan), sisa saldo pelanggan
+curl "https://freetokenai.example.com/api/v1/admin/receipts/lookup?code=RST-482913" \
+  -H "Authorization: Bearer <access_token>"
+
+# Daftar struk kafe (status=claimed|unclaimed, q=potongan kode, limit maks 100)
+curl "https://freetokenai.example.com/api/v1/admin/receipts?status=unclaimed&limit=20" \
+  -H "Authorization: Bearer <access_token>"
+```
+
+**6. Perpanjang sesi** — saat API membalas `401`, tukar `refresh_token` lalu ulangi request. Simpan `refresh_token` baru (yang lama hangus).
+
+```bash
+curl -X POST https://freetokenai.example.com/api/v1/admin/auth/refresh \
   -H "Content-Type: application/json" \
   -d '{"refresh_token":"<refresh_token>"}'
 ```
+
+**Kode error yang perlu ditangani POS**
+
+| HTTP | `error.code` | Arti / tindakan |
+|------|--------------|-----------------|
+| 400 | `INVALID_POS_REFERENCE` | `pos_reference_id` kosong / bukan 3–100 karakter |
+| 400 | `INVALID_AMOUNT`, `AMOUNT_TOO_SMALL` | Nominal belanja tidak valid / terlalu kecil untuk 1 token |
+| 400 | `INVALID_TOKENS`, `PACKAGE_NOT_FOUND` | Jumlah token tidak valid / paket tidak aktif |
+| 401 | (apa pun) | Token kedaluwarsa → refresh (langkah 6), lalu ulangi |
+| 402 | `INSUFFICIENT_CAFE_QUOTA` | Saldo prepaid kafe habis → minta top-up ke super admin |
+| 403 | `FORBIDDEN_CAFE`, `FORBIDDEN_ORIGIN` | Akun bukan kasir kafe ini / header `Origin` tidak diizinkan |
+
+Header `Origin` tidak wajib untuk panggilan server-ke-server (curl, backend POS). Bila POS memanggil dari **browser** di domain lain, daftarkan domain itu di env `ADMIN_ALLOWED_ORIGINS`.
 
 ### 7. Health check
 
@@ -441,7 +546,7 @@ Token adalah unit aplikasi (bukan token LLM).
 
 | Aksi | Biaya |
 |------|-------|
-| Chat (`resto-chat-fast`) | 1 Token per pesan |
+| Chat (`freetokenai-chat-fast`) | 1 Token per pesan |
 | Chat model pro / `120b` | 10 Token per pesan |
 | Streaming chat | 1 Token per 1.000 token LLM (10 untuk model pro) |
 | Image default | 3 Token |
